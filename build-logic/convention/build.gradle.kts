@@ -5,6 +5,8 @@ plugins {
     `kotlin-dsl`
 }
 
+group = "cz.cleanship.buildlogic"
+
 kotlin {
     jvmToolchain(21)
 }
@@ -12,4 +14,20 @@ kotlin {
 dependencies {
     // Add a dependency on the Kotlin Gradle plugin, so that convention plugins can apply it.
     implementation(libs.kotlinGradlePlugin)
+}
+
+tasks {
+    validatePlugins {
+        enableStricterValidation = true
+        failOnWarning = true
+    }
+}
+
+gradlePlugin {
+    plugins {
+        register("kotlinJvmLibrary") {
+            id = libs.plugins.cleanship.kotlin.convention.get().pluginId
+            implementationClass = "cz.cleanship.KotlinJvmConventionPlugin"
+        }
+    }
 }

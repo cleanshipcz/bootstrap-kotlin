@@ -27,3 +27,11 @@ The shared build logic was extracted to a convention plugin located in `buildSrc
 
 This project uses a version catalog (see `gradle/libs.versions.toml`) to declare and version dependencies
 and both a build cache and a configuration cache (see `gradle.properties`).
+
+### Code style
+
+* This project uses [ktlint](https://ktlint.github.io/) to enforce a consistent code style.
+* You can run `./gradlew ktlintCheck` to check the code style and `./gradlew ktlintFormat` to automatically format the code.
+* You can also install the [ktlint IntelliJ plugin](https://plugins.jetbrains.com/plugin/15036-ktlint) to get real-time feedback in the IDE.
+* To disable a rule, add a rule to the `.editorconfig` file in the root of the project.
+    * Tip: use the plugin to generate the suppression for the given line, then copy the suppression to the `.editorconfig` file (replace `:` with `-`)

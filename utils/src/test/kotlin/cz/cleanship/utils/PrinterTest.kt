@@ -1,8 +1,8 @@
 package cz.cleanship.utils
 
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlinx.serialization.json.Json
 
 internal class PrinterTest {
 

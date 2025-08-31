@@ -5,8 +5,6 @@ plugins {
     `kotlin-dsl`
 }
 
-group = "cz.cleanship.buildlogic"
-
 kotlin {
     jvmToolchain(21)
 }
@@ -27,7 +25,7 @@ gradlePlugin {
     plugins {
         register("kotlinJvmLibrary") {
             id = libs.plugins.cleanship.kotlin.convention.get().pluginId
-            implementationClass = "cz.cleanship.KotlinJvmConventionPlugin"
+            implementationClass = "cz.cleanship.plugin.KotlinJvmConventionPlugin"
         }
     }
 }

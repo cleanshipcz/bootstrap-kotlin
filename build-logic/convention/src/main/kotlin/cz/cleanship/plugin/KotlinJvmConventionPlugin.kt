@@ -1,4 +1,4 @@
-package cz.cleanship
+package cz.cleanship.plugin
 
 import org.gradle.api.Plugin
 import org.gradle.api.Project
@@ -10,7 +10,7 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
         with(target) {
             // access version catalog
-            
+
             apply(plugin = "org.jetbrains.kotlin.jvm")
 
             extensions.configure(org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension::class.java) {

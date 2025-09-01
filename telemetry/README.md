@@ -55,6 +55,51 @@ export TELEMETRY_EXPORTER_TRACES=otlp
 export TELEMETRY_OTLP_ENDPOINT=http://otel-collector:4318
 ```
 
+## Exporter selection and typical setups
+
+- Traces (`TELEMETRY_EXPORTER_TRACES`)
+  - `none`: disable trace export
+  - `logging`: export spans to stdout (LoggingSpanExporter)
+  - `otlp`: export spans to an OTLP collector (uses `TELEMETRY_OTLP_ENDPOINT`)
+  - `inmemory`: in-memory exporter for tests
+
+- Metrics (`TELEMETRY_EXPORTER_METRICS`)
+  - `none`: only a SimpleMeterRegistry is active
+  - `prometheus`: adds PrometheusMeterRegistry; `prometheusScrape()` returns exposition text
+  - `otlp`: adds OtlpMeterRegistry; pushes metrics to the collector
+  - `logging`: adds LoggingMeterRegistry; periodically logs metric snapshots
+
+Notes
+- Exactly one metrics exporter is active (besides the always-present SimpleMeterRegistry).
+- Traces and metrics are configured independently (e.g., traces=otlp, metrics=prometheus).
+- The facade logger (`telemetry.logger(name)`) is independent of exporters and always available.
+
+Typical configs
+- Local dev: `TRACES=logging`, `METRICS=logging`
+- Prod: `TRACES=otlp`, `METRICS=prometheus`, `OTLP_ENDPOINT=http://collector:4318`
+- Tests: `TRACES=inmemory`, `METRICS=none`
+
+## What prints to STDOUT vs what is sent
+
+- Application logs (always)
+  - Printed by your Logback appenders (e.g., ConsoleAppender).
+  - `telemetry.logger(name)` injects `trace_id`/`span_id` into MDC per call.
+  - Optional `TraceJsonProvider` writes `trace_id`/`span_id` in JSON if added to providers.
+
+- Traces (`TELEMETRY_EXPORTER_TRACES`)
+  - `logging`: printed to STDOUT (OpenTelemetry LoggingSpanExporter).
+  - `otlp`: sent to the collector at `TELEMETRY_OTLP_ENDPOINT`; nothing printed.
+  - `inmemory`: kept in-memory for tests; nothing printed or sent.
+  - `none`: nothing printed or sent.
+
+- Metrics (`TELEMETRY_EXPORTER_METRICS`)
+  - `logging`: periodic metric snapshots printed to STDOUT (LoggingMeterRegistry).
+  - `prometheus`: not printed/sent automatically; expose `telemetry.prometheusScrape()` via HTTP and Prometheus pulls it.
+  - `otlp`: pushed to the collector (OtlpMeterRegistry); nothing printed.
+  - `none`: nothing printed or sent.
+
+Note: the facade logger API is independent of exporters; it is always available.
+
 ## Exposing Prometheus metrics
 - Plain Kotlin/Ktor: add an endpoint and return `telemetry.prometheusScrape()` as text/plain.
 ```kotlin

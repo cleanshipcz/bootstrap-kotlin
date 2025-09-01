@@ -56,51 +56,53 @@ class DefaultTelemetry(
         // Metrics registries
         val simple = SimpleMeterRegistry()
         meterRegistry.add(simple)
-        when (config.metricsExporter) {
-            MetricsExporter.PROMETHEUS -> {
-                val prom = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-                meterRegistry.add(prom)
-                prometheusRegistry = prom
-            }
-
-            MetricsExporter.LOGGING -> {
-                val logging = LoggingMeterRegistry(object : LoggingRegistryConfig {
-                    override fun get(key: String) = null
-                    override fun step(): Duration = Duration.ofSeconds(10)
-                }, Clock.SYSTEM)
-                meterRegistry.add(logging)
-            }
-
-            MetricsExporter.OTLP -> {
-                val endpoint = config.otlpEndpoint ?: "http://localhost:4318"
-                val otlp = OtlpMeterRegistry(
-                    object : OtlpConfig {
-                        override fun get(key: String): String? = null
-                        override fun url(): String = endpoint
-                    },
-                    Clock.SYSTEM
-                )
-                meterRegistry.add(otlp)
-            }
-
-            MetricsExporter.NONE -> { /* only simple */
+        for (exporter in config.metricsExporters) {
+            when (exporter) {
+                MetricsExporter.PROMETHEUS -> {
+                    val prom = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
+                    meterRegistry.add(prom)
+                    prometheusRegistry = prom
+                }
+                MetricsExporter.LOGGING -> {
+                    val logging = LoggingMeterRegistry(object : LoggingRegistryConfig {
+                        override fun get(key: String) = null
+                        override fun step(): Duration = Duration.ofSeconds(10)
+                    }, Clock.SYSTEM)
+                    meterRegistry.add(logging)
+                }
+                MetricsExporter.OTLP -> {
+                    val endpoint = config.otlpEndpoint ?: "http://localhost:4318"
+                    val otlp = OtlpMeterRegistry(
+                        object : OtlpConfig {
+                            override fun get(key: String): String? = null
+                            override fun url(): String = endpoint
+                        },
+                        Clock.SYSTEM
+                    )
+                    meterRegistry.add(otlp)
+                }
+                MetricsExporter.NONE -> { /* skip */ }
             }
         }
 
         // Tracing
-        val spanExporter: SpanExporter? = when (config.tracesExporter) {
-            TracesExporter.LOGGING -> LoggingSpanExporter.create()
-            TracesExporter.OTLP -> {
-                val builder = OtlpGrpcSpanExporter.builder()
-                config.otlpEndpoint?.let { builder.setEndpoint(it) }
-                builder.build()
+        val spanExporters = mutableListOf<Pair<SpanExporter, Boolean>>() // exporter to isInMemory
+        for (exporter in config.tracesExporters) {
+            when (exporter) {
+                TracesExporter.LOGGING -> spanExporters += LoggingSpanExporter.create() to false
+                TracesExporter.OTLP -> {
+                    val builder = OtlpGrpcSpanExporter.builder()
+                    config.otlpEndpoint?.let { builder.setEndpoint(it) }
+                    spanExporters += builder.build() to false
+                }
+                TracesExporter.INMEMORY_FOR_TESTS -> {
+                    val inMem = (testSpanExporter as? LocalInMemorySpanExporter)
+                        ?: LocalInMemorySpanExporter()
+                    localInMemory = inMem
+                    spanExporters += inMem to true
+                }
+                TracesExporter.NONE -> { /* skip */ }
             }
-
-            TracesExporter.INMEMORY_FOR_TESTS -> testSpanExporter ?: LocalInMemorySpanExporter().also {
-                localInMemory = it
-            }
-
-            TracesExporter.NONE -> null
         }
 
         val resource = Resource.create(
@@ -110,11 +112,11 @@ class DefaultTelemetry(
         )
 
         val tracerProviderBuilder = SdkTracerProvider.builder().setResource(resource)
-        if (spanExporter != null) {
-            val processor = if (config.tracesExporter == TracesExporter.INMEMORY_FOR_TESTS) {
-                SimpleSpanProcessor.create(spanExporter)
+        for ((exporter, isInMemory) in spanExporters) {
+            val processor = if (isInMemory) {
+                SimpleSpanProcessor.create(exporter)
             } else {
-                BatchSpanProcessor.builder(spanExporter).build()
+                BatchSpanProcessor.builder(exporter).build()
             }
             tracerProviderBuilder.addSpanProcessor(processor)
         }
@@ -312,7 +314,7 @@ class DefaultTelemetry(
 
     // Internal accessors for tests
     internal fun inMemorySpans(): List<SpanData> {
-        check(config.tracesExporter == TracesExporter.INMEMORY_FOR_TESTS) { "InMemory exporter not active" }
+        check(config.tracesExporters.contains(TracesExporter.INMEMORY_FOR_TESTS)) { "InMemory exporter not active" }
         localInMemory?.let { return it.finishedSpanItems }
         val e = testSpanExporter
         if (e is LocalInMemorySpanExporter) return e.finishedSpanItems

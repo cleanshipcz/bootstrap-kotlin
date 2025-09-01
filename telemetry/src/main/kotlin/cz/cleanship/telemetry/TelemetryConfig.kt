@@ -7,18 +7,18 @@ package cz.cleanship.telemetry
  * using [fromEnvironment].
  *
  * @property serviceName logical service name reported to backends
- * @property tracesExporter trace exporter selection
- * @property metricsExporter metrics exporter selection
+ * @property tracesExporters selected trace exporters (multiple allowed)
+ * @property metricsExporters selected metrics exporters (multiple allowed)
  * @property otlpEndpoint OTLP endpoint URL when OTLP exporters are used
  */
 data class TelemetryConfig(
     val serviceName: String = System.getProperty("telemetry.service.name")
         ?: System.getenv("TELEMETRY_SERVICE_NAME")
         ?: "bootstrap-kotlin",
-    val tracesExporter: TracesExporter = TracesExporter.from(
+    val tracesExporters: Set<TracesExporter> = TracesExporter.fromList(
         System.getProperty("telemetry.traces.exporter") ?: System.getenv("TELEMETRY_EXPORTER_TRACES")
     ),
-    val metricsExporter: MetricsExporter = MetricsExporter.from(
+    val metricsExporters: Set<MetricsExporter> = MetricsExporter.fromList(
         System.getProperty("telemetry.metrics.exporter") ?: System.getenv("TELEMETRY_EXPORTER_METRICS")
     ),
     val otlpEndpoint: String? = System.getProperty("telemetry.otlp.endpoint")
@@ -54,6 +54,20 @@ enum class TracesExporter(val id: String) {
             INMEMORY_FOR_TESTS.id -> INMEMORY_FOR_TESTS
             else -> NONE
         }
+
+        /**
+         * Parses a comma-separated list of exporter ids into a set.
+         *
+         * @param value comma-separated exporter ids (case-insensitive)
+         * @return set of exporters; empty if none
+         */
+        fun fromList(value: String?): Set<TracesExporter> = value
+            ?.split(',')
+            ?.mapNotNull { token -> token.trim().takeIf { it.isNotEmpty() } }
+            ?.map { from(it) }
+            ?.filter { it != NONE }
+            ?.toSet()
+            ?: emptySet()
     }
 }
 
@@ -77,6 +91,20 @@ enum class MetricsExporter(val id: String) {
             LOGGING.id -> LOGGING
             else -> NONE
         }
+
+        /**
+         * Parses a comma-separated list of exporter ids into a set.
+         *
+         * @param value comma-separated exporter ids (case-insensitive)
+         * @return set of exporters; empty if none
+         */
+        fun fromList(value: String?): Set<MetricsExporter> = value
+            ?.split(',')
+            ?.mapNotNull { token -> token.trim().takeIf { it.isNotEmpty() } }
+            ?.map { from(it) }
+            ?.filter { it != NONE }
+            ?.toSet()
+            ?: emptySet()
     }
 }
 

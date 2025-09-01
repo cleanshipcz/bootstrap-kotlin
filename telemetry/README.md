@@ -40,10 +40,12 @@ fun main() {
 
 ## Configuration (env or -D system properties)
 - TELEMETRY_SERVICE_NAME / -Dtelemetry.service.name (default: `bootstrap-kotlin`)
-- TELEMETRY_EXPORTER_TRACES / -Dtelemetry.traces.exporter: `none` | `logging` | `otlp` | `inmemory`
-- TELEMETRY_EXPORTER_METRICS / -Dtelemetry.metrics.exporter: `none` | `prometheus` | `otlp` | `logging`
+- TELEMETRY_EXPORTER_TRACES / -Dtelemetry.traces.exporter: comma-separated list of `none` | `logging` | `otlp` | `inmemory`
+- TELEMETRY_EXPORTER_METRICS / -Dtelemetry.metrics.exporter: comma-separated list of `none` | `prometheus` | `otlp` | `logging`
 - TELEMETRY_OTLP_ENDPOINT / -Dtelemetry.otlp.endpoint (default: none; example: `http://localhost:4318`)
-See “Exporter selection and typical setups” below for concrete configurations.
+Notes:
+- Multiple exporters can be enabled simultaneously by comma-separating values.
+- See “Exporter selection and typical setups” below for concrete configurations.
 
 ## Exporter selection and typical setups
 
@@ -60,13 +62,14 @@ See “Exporter selection and typical setups” below for concrete configuration
   - `logging`: adds LoggingMeterRegistry; periodically logs metric snapshots
 
 Notes
-- Exactly one metrics exporter is active (besides the always-present SimpleMeterRegistry).
-- Traces and metrics are configured independently (e.g., traces=otlp, metrics=prometheus).
+- Exporters are additive: you can enable multiple for traces and metrics at the same time (the SimpleMeterRegistry is always present).
+- Traces and metrics are configured independently.
 - The facade logger (`telemetry.logger(name)`) is independent of exporters and always available.
 
 Typical configs
-- Local dev: `TRACES=logging`, `METRICS=logging`
-- Prod: `TRACES=otlp`, `METRICS=prometheus`, `OTLP_ENDPOINT=http://collector:4318`
+- Local dev (console only): `TRACES=logging`, `METRICS=logging`
+- Prod (pull metrics, send traces): `TRACES=otlp`, `METRICS=prometheus`, `OTLP_ENDPOINT=http://collector:4318`
+- Combined (send and see locally): `TRACES=logging,otlp`, `METRICS=prometheus,otlp,logging`
 - Tests: `TRACES=inmemory`, `METRICS=none`
 
 ## What prints to STDOUT vs what is sent
@@ -78,15 +81,17 @@ Typical configs
 
 - Traces (`TELEMETRY_EXPORTER_TRACES`)
   - `logging`: printed to STDOUT (OpenTelemetry LoggingSpanExporter).
-  - `otlp`: sent to the collector at `TELEMETRY_OTLP_ENDPOINT`; nothing printed.
-  - `inmemory`: kept in-memory for tests; nothing printed or sent.
-  - `none`: nothing printed or sent.
+  - `otlp`: sent to the collector at `TELEMETRY_OTLP_ENDPOINT`.
+  - `inmemory`: kept in-memory for tests.
+  - `none`: no output.
+  - If you enable multiple (e.g., `logging,otlp`), both happen.
 
 - Metrics (`TELEMETRY_EXPORTER_METRICS`)
   - `logging`: periodic metric snapshots printed to STDOUT (LoggingMeterRegistry).
-  - `prometheus`: not printed/sent automatically; expose `telemetry.prometheusScrape()` via HTTP and Prometheus pulls it.
-  - `otlp`: pushed to the collector (OtlpMeterRegistry); nothing printed.
-  - `none`: nothing printed or sent.
+  - `prometheus`: expose `telemetry.prometheusScrape()` via HTTP and Prometheus pulls it.
+  - `otlp`: pushed to the collector (OtlpMeterRegistry).
+  - `none`: no output.
+  - If you enable multiple (e.g., `prometheus,otlp,logging`), all behaviors apply.
 
 Note: the facade logger API is independent of exporters; it is always available.
 

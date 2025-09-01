@@ -8,11 +8,11 @@ import java.util.concurrent.TimeUnit
 
 class TelemetryMetricsTest {
 
-    private fun createTelemetry(metricsExporter: MetricsExporter = MetricsExporter.NONE): DefaultTelemetry {
+    private fun createTelemetry(metricsExporters: Set<MetricsExporter> = emptySet()): DefaultTelemetry {
         val cfg = TelemetryConfig(
             serviceName = "test-service",
-            tracesExporter = TracesExporter.INMEMORY_FOR_TESTS,
-            metricsExporter = metricsExporter,
+            tracesExporters = setOf(TracesExporter.INMEMORY_FOR_TESTS),
+            metricsExporters = metricsExporters,
             otlpEndpoint = null
         )
         return DefaultTelemetry(cfg)

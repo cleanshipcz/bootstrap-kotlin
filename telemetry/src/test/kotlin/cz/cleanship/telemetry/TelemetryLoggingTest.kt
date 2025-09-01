@@ -14,8 +14,8 @@ class TelemetryLoggingTest {
     private fun createTelemetry(): DefaultTelemetry {
         val cfg = TelemetryConfig(
             serviceName = "test-service",
-            tracesExporter = TracesExporter.INMEMORY_FOR_TESTS,
-            metricsExporter = MetricsExporter.NONE,
+            tracesExporters = setOf(TracesExporter.INMEMORY_FOR_TESTS),
+            metricsExporters = emptySet(),
             otlpEndpoint = null
         )
         return DefaultTelemetry(cfg)

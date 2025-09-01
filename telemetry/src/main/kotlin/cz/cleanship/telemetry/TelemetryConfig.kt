@@ -1,5 +1,8 @@
 package cz.cleanship.telemetry
 
+import cz.cleanship.telemetry.TelemetryConfig.Companion.fromEnvironment
+
+
 /**
  * Configuration for the telemetry module.
  *

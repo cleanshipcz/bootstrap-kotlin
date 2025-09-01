@@ -23,8 +23,8 @@ naming:
 
 # formatting rules come from detekt-formatting (ktlint)
 # You can toggle individual rules here if needed, e.g.:
-# formatting:
-#   MaximumLineLength:
-#     active: false
-#   NoWildcardImports:
-#     active: true
+formatting:
+  MaximumLineLength:
+    active: false
+  NoWildcardImports:
+    active: true

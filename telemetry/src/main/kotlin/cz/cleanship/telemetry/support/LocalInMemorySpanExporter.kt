@@ -3,7 +3,7 @@ package cz.cleanship.telemetry.support
 import io.opentelemetry.sdk.common.CompletableResultCode
 import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.export.SpanExporter
-import java.util.Collections
+import java.util.*
 
 /**
  * Lightweight in-memory span exporter intended for unit tests.
@@ -44,5 +44,7 @@ class LocalInMemorySpanExporter : SpanExporter {
     /**
      * Clears the collected spans.
      */
-    fun reset() { _spans.clear() }
+    fun reset() {
+        _spans.clear()
+    }
 }

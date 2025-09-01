@@ -63,6 +63,7 @@ class DefaultTelemetry(
                     meterRegistry.add(prom)
                     prometheusRegistry = prom
                 }
+
                 MetricsExporter.LOGGING -> {
                     val logging = LoggingMeterRegistry(object : LoggingRegistryConfig {
                         override fun get(key: String) = null
@@ -70,6 +71,7 @@ class DefaultTelemetry(
                     }, Clock.SYSTEM)
                     meterRegistry.add(logging)
                 }
+
                 MetricsExporter.OTLP -> {
                     val endpoint = config.otlpEndpoint ?: "http://localhost:4318"
                     val otlp = OtlpMeterRegistry(
@@ -81,7 +83,9 @@ class DefaultTelemetry(
                     )
                     meterRegistry.add(otlp)
                 }
-                MetricsExporter.NONE -> { /* skip */ }
+
+                MetricsExporter.NONE -> { /* skip */
+                }
             }
         }
 
@@ -95,13 +99,16 @@ class DefaultTelemetry(
                     config.otlpEndpoint?.let { builder.setEndpoint(it) }
                     spanExporters += builder.build() to false
                 }
+
                 TracesExporter.INMEMORY_FOR_TESTS -> {
                     val inMem = (testSpanExporter as? LocalInMemorySpanExporter)
                         ?: LocalInMemorySpanExporter()
                     localInMemory = inMem
                     spanExporters += inMem to true
                 }
-                TracesExporter.NONE -> { /* skip */ }
+
+                TracesExporter.NONE -> { /* skip */
+                }
             }
         }
 
@@ -295,11 +302,14 @@ class DefaultTelemetry(
                 putMdc("span_id", ctx.spanId, addedKeys)
             }
             for ((k, v) in fields) putMdc(k, v?.toString() ?: "null", addedKeys)
-            try { logCall() } finally {
+            try {
+                logCall()
+            } finally {
                 // Clean up keys we added to MDC to avoid leaking state across threads
                 for (k in addedKeys) MDC.remove(k)
             }
         }
+
         /**
          * Adds a key/value to MDC and tracks it for cleanup.
          *

@@ -1,8 +1,8 @@
 package cz.cleanship.telemetry
 
 import ch.qos.logback.classic.Logger
-import ch.qos.logback.core.read.ListAppender
 import ch.qos.logback.classic.spi.ILoggingEvent
+import ch.qos.logback.core.read.ListAppender
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertTrue

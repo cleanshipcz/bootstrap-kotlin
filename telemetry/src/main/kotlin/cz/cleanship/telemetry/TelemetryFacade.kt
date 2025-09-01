@@ -127,6 +127,7 @@ interface GaugeHandle {
 interface SpanScope : AutoCloseable {
     /** The active span. */
     val span: TelemetrySpan
+
     /** Ends the span and restores the previous context. */
     override fun close()
 }
@@ -181,6 +182,7 @@ interface TelemetrySpan {
      * The trace ID.
      */
     val traceId: String
+
     /**
      * The span ID.
      */

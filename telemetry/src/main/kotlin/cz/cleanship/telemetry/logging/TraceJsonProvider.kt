@@ -1,9 +1,9 @@
 package cz.cleanship.telemetry.logging
 
+import ch.qos.logback.classic.spi.ILoggingEvent
 import com.fasterxml.jackson.core.JsonGenerator
 import io.opentelemetry.api.trace.Span
 import net.logstash.logback.composite.AbstractJsonProvider
-import ch.qos.logback.classic.spi.ILoggingEvent
 
 /**
  * Logstash provider that writes `trace_id` and `span_id` from the current OpenTelemetry span.

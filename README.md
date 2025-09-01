@@ -35,3 +35,11 @@ and both a build cache and a configuration cache (see `gradle.properties`).
 * You can also install the [ktlint IntelliJ plugin](https://plugins.jetbrains.com/plugin/15036-ktlint) to get real-time feedback in the IDE.
 * To disable a rule, add a rule to the `.editorconfig` file in the root of the project.
     * Tip: use the plugin to generate the suppression for the given line, then copy the suppression to the `.editorconfig` file (replace `:` with `-`)
+
+#### Static analysis
+
+* This project uses [Detekt](https://detekt.dev/) for Kotlin static code analysis.
+* Run `./gradlew detekt` to analyze the code. Detekt is also wired into `./gradlew check`.
+* Configuration lives in `detekt.yml` at the project root. Adjust rules there to fit your needs.
+* Formatting rules are enabled via `detekt-formatting` to align with ktlint.
+* To use a baseline, generate one with `./gradlew detektBaseline` and configure the `baseline` property in the Detekt settings (see `build-logic/convention/src/main/kotlin/cz/cleanship/plugin/KotlinJvmConventionPlugin.kt`).

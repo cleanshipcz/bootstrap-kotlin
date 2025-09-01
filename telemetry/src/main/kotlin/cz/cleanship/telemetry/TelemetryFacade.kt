@@ -1,6 +1,5 @@
 package cz.cleanship.telemetry
 
-
 /**
  * Framework-agnostic facade over tracing, metrics, and logging.
  * Application code should depend only on this interface, not on vendor SDKs.
@@ -14,7 +13,10 @@ interface TelemetryFacade {
      * @param tags metric tags
      * @return a handle to increment the counter
      */
-    fun counter(name: String, tags: Map<String, String> = emptyMap()): CounterHandle
+    fun counter(
+        name: String,
+        tags: Map<String, String> = emptyMap(),
+    ): CounterHandle
 
     /**
      * Returns a timer.
@@ -23,7 +25,10 @@ interface TelemetryFacade {
      * @param tags metric tags
      * @return a handle to record durations
      */
-    fun timer(name: String, tags: Map<String, String> = emptyMap()): TimerHandle
+    fun timer(
+        name: String,
+        tags: Map<String, String> = emptyMap(),
+    ): TimerHandle
 
     /**
      * Returns a gauge.
@@ -32,9 +37,13 @@ interface TelemetryFacade {
      * @param tags metric tags
      * @return a handle to set gauge values
      */
-    fun gauge(name: String, tags: Map<String, String> = emptyMap()): GaugeHandle
+    fun gauge(
+        name: String,
+        tags: Map<String, String> = emptyMap(),
+    ): GaugeHandle
 
     // ---- Tracing ----
+
     /**
      * Starts a span and makes it current.
      *
@@ -44,7 +53,11 @@ interface TelemetryFacade {
      * @return a scope representing the active span
      * @see inSpan
      */
-    fun startSpan(name: String, kind: SpanKind = SpanKind.INTERNAL, attributes: Map<String, Any?> = emptyMap()): SpanScope
+    fun startSpan(
+        name: String,
+        kind: SpanKind = SpanKind.INTERNAL,
+        attributes: Map<String, Any?> = emptyMap(),
+    ): SpanScope
 
     /**
      * Runs [block] within a new span and returns its result.
@@ -59,10 +72,11 @@ interface TelemetryFacade {
         name: String,
         kind: SpanKind = SpanKind.INTERNAL,
         attributes: Map<String, Any?> = emptyMap(),
-        block: suspend (TelemetrySpan) -> T
+        block: suspend (TelemetrySpan) -> T,
     ): T
 
     // ---- Logging ----
+
     /**
      * Returns a structured logger bound to the given name.
      *
@@ -76,6 +90,7 @@ interface TelemetryFacade {
     fun logger(name: String): TelemetryLogger
 
     // ---- Exporters / Utilities ----
+
     /**
      * Returns Prometheus exposition text.
      *
@@ -88,6 +103,7 @@ interface TelemetryFacade {
 }
 
 // ------------ Handles ------------
+
 interface CounterHandle {
     /**
      * Increments the counter by [amount].

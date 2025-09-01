@@ -11,7 +11,7 @@ class TelemetrySpanScopeTest {
             serviceName = "test-service",
             tracesExporters = setOf(TracesExporter.INMEMORY_FOR_TESTS),
             metricsExporters = emptySet(),
-            otlpEndpoint = null
+            otlpEndpoint = null,
         )
         return DefaultTelemetry(cfg, LocalInMemorySpanExporter())
     }

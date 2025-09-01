@@ -2,7 +2,6 @@ package cz.cleanship.telemetry
 
 import cz.cleanship.telemetry.TelemetryConfig.Companion.fromEnvironment
 
-
 /**
  * Configuration for the telemetry module.
  *
@@ -19,10 +18,10 @@ data class TelemetryConfig(
         ?: System.getenv("TELEMETRY_SERVICE_NAME")
         ?: "bootstrap-kotlin",
     val tracesExporters: Set<TracesExporter> = TracesExporter.fromList(
-        System.getProperty("telemetry.traces.exporter") ?: System.getenv("TELEMETRY_EXPORTER_TRACES")
+        System.getProperty("telemetry.traces.exporter") ?: System.getenv("TELEMETRY_EXPORTER_TRACES"),
     ),
     val metricsExporters: Set<MetricsExporter> = MetricsExporter.fromList(
-        System.getProperty("telemetry.metrics.exporter") ?: System.getenv("TELEMETRY_EXPORTER_METRICS")
+        System.getProperty("telemetry.metrics.exporter") ?: System.getenv("TELEMETRY_EXPORTER_METRICS"),
     ),
     val otlpEndpoint: String? = System.getProperty("telemetry.otlp.endpoint")
         ?: System.getenv("TELEMETRY_OTLP_ENDPOINT"),
@@ -42,7 +41,8 @@ enum class TracesExporter(val id: String) {
     NONE("none"),
     LOGGING("logging"),
     OTLP("otlp"),
-    INMEMORY_FOR_TESTS("inmemory");
+    INMEMORY_FOR_TESTS("inmemory"),
+    ;
 
     companion object {
         /**
@@ -79,7 +79,8 @@ enum class MetricsExporter(val id: String) {
     NONE("none"),
     PROMETHEUS("prometheus"),
     OTLP("otlp"),
-    LOGGING("logging");
+    LOGGING("logging"),
+    ;
 
     companion object {
         /**
@@ -110,4 +111,3 @@ enum class MetricsExporter(val id: String) {
             ?: emptySet()
     }
 }
-

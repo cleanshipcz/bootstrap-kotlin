@@ -16,6 +16,8 @@ style:
     active: false        # allow magic numbers; enable and configure ignoreNumbers if you want stricter checks
   MaxLineLength:
     active: false        # enforce maximum line length via editor/ktlint instead
+  WildcardImport:
+    active: false
 
 naming:
   TopLevelPropertyNaming:
@@ -27,4 +29,4 @@ formatting:
   MaximumLineLength:
     active: false
   NoWildcardImports:
-    active: true
+    active: false

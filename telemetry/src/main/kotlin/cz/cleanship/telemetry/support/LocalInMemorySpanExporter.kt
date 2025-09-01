@@ -9,12 +9,12 @@ import java.util.*
  * Lightweight in-memory span exporter intended for unit tests.
  */
 class LocalInMemorySpanExporter : SpanExporter {
-    private val _spans: MutableList<SpanData> = Collections.synchronizedList(mutableListOf())
+    private val spans: MutableList<SpanData> = Collections.synchronizedList(mutableListOf())
 
     /**
      * Snapshot of finished spans exported so far.
      */
-    val finishedSpanItems: List<SpanData> get() = ArrayList(_spans)
+    val finishedSpanItems: List<SpanData> get() = ArrayList(spans)
 
     /**
      * Adds [spans] to the in-memory buffer.
@@ -23,7 +23,7 @@ class LocalInMemorySpanExporter : SpanExporter {
      * @return success code
      */
     override fun export(spans: MutableCollection<SpanData>): CompletableResultCode {
-        _spans.addAll(spans)
+        this.spans.addAll(spans)
         return CompletableResultCode.ofSuccess()
     }
 
@@ -45,6 +45,6 @@ class LocalInMemorySpanExporter : SpanExporter {
      * Clears the collected spans.
      */
     fun reset() {
-        _spans.clear()
+        spans.clear()
     }
 }

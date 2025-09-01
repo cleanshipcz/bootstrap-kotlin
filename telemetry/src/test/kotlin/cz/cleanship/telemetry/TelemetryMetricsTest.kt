@@ -13,7 +13,7 @@ class TelemetryMetricsTest {
             serviceName = "test-service",
             tracesExporters = setOf(TracesExporter.INMEMORY_FOR_TESTS),
             metricsExporters = metricsExporters,
-            otlpEndpoint = null
+            otlpEndpoint = null,
         )
         return DefaultTelemetry(cfg)
     }
@@ -25,7 +25,11 @@ class TelemetryMetricsTest {
         counter.increment(2.0)
         counter.increment(3.0)
 
-        val found = Search.`in`(telemetry.registry()).name("test_counter").tag("label", "value").counter()
+        val found = Search
+            .`in`(telemetry.registry())
+            .name("test_counter")
+            .tag("label", "value")
+            .counter()
         assertNotNull(found)
         assertEquals(5.0, found!!.count(), 1e-6)
     }
@@ -37,7 +41,11 @@ class TelemetryMetricsTest {
         timer.record(25)
         timer.recordSuspend { /* work */ }
 
-        val found = Search.`in`(telemetry.registry()).name("test_timer").tag("status", "ok").timer()
+        val found = Search
+            .`in`(telemetry.registry())
+            .name("test_timer")
+            .tag("status", "ok")
+            .timer()
         assertNotNull(found)
         assertTrue(found!!.count() >= 2L)
         assertTrue(found.totalTime(TimeUnit.NANOSECONDS) > 0.0)
@@ -48,7 +56,11 @@ class TelemetryMetricsTest {
         val telemetry = createTelemetry()
         val gauge = telemetry.gauge("test_gauge", mapOf("phase" to "alpha"))
         gauge.set(7.0)
-        val found = Search.`in`(telemetry.registry()).name("test_gauge").tag("phase", "alpha").gauge()
+        val found = Search
+            .`in`(telemetry.registry())
+            .name("test_gauge")
+            .tag("phase", "alpha")
+            .gauge()
         assertNotNull(found)
         assertEquals(7.0, found!!.value(), 1e-6)
         gauge.set(2.5)

@@ -11,7 +11,7 @@ class TelemetryPrometheusTest {
             serviceName = "test-service",
             tracesExporters = setOf(TracesExporter.INMEMORY_FOR_TESTS),
             metricsExporters = setOf(MetricsExporter.PROMETHEUS),
-            otlpEndpoint = null
+            otlpEndpoint = null,
         )
         return DefaultTelemetry(cfg)
     }

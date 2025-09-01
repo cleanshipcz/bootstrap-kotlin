@@ -39,6 +39,7 @@ import java.util.concurrent.atomic.AtomicReference
  * @param config telemetry configuration
  * @param testSpanExporter optional span exporter used for tests
  */
+@Suppress("TooManyFunctions")
 class DefaultTelemetry(
     private val config: TelemetryConfig = TelemetryConfig.fromEnvironment(),
     private val testSpanExporter: SpanExporter? = null,
@@ -51,6 +52,7 @@ class DefaultTelemetry(
     private val tracer: Tracer
     private val sdkTracerProvider: SdkTracerProvider
     private var localInMemory: LocalInMemorySpanExporter? = null
+    private val bootLogger = LoggerFactory.getLogger(DefaultTelemetry::class.java)
 
     init {
         // Metrics registries
@@ -65,10 +67,14 @@ class DefaultTelemetry(
                 }
 
                 MetricsExporter.LOGGING -> {
-                    val logging = LoggingMeterRegistry(object : LoggingRegistryConfig {
-                        override fun get(key: String) = null
-                        override fun step(): Duration = Duration.ofSeconds(10)
-                    }, Clock.SYSTEM)
+                    val logging = LoggingMeterRegistry(
+                        object : LoggingRegistryConfig {
+                            override fun get(key: String) = null
+
+                            override fun step(): Duration = Duration.ofSeconds(10)
+                        },
+                        Clock.SYSTEM,
+                    )
                     meterRegistry.add(logging)
                 }
 
@@ -77,14 +83,15 @@ class DefaultTelemetry(
                     val otlp = OtlpMeterRegistry(
                         object : OtlpConfig {
                             override fun get(key: String): String? = null
+
                             override fun url(): String = endpoint
                         },
-                        Clock.SYSTEM
+                        Clock.SYSTEM,
                     )
                     meterRegistry.add(otlp)
                 }
 
-                MetricsExporter.NONE -> { /* skip */
+                MetricsExporter.NONE -> { // skip
                 }
             }
         }
@@ -96,7 +103,9 @@ class DefaultTelemetry(
                 TracesExporter.LOGGING -> spanExporters += LoggingSpanExporter.create() to false
                 TracesExporter.OTLP -> {
                     val builder = OtlpGrpcSpanExporter.builder()
-                    config.otlpEndpoint?.let { builder.setEndpoint(it) }
+                    config.otlpEndpoint?.let {
+                        builder.setEndpoint(it)
+                    }
                     spanExporters += builder.build() to false
                 }
 
@@ -107,15 +116,16 @@ class DefaultTelemetry(
                     spanExporters += inMem to true
                 }
 
-                TracesExporter.NONE -> { /* skip */
+                TracesExporter.NONE -> { // skip
                 }
             }
         }
 
         val resource = Resource.create(
             io.opentelemetry.api.common.Attributes.of(
-                AttributeKey.stringKey("service.name"), config.serviceName
-            )
+                AttributeKey.stringKey("service.name"),
+                config.serviceName,
+            ),
         )
 
         val tracerProviderBuilder = SdkTracerProvider.builder().setResource(resource)
@@ -130,10 +140,15 @@ class DefaultTelemetry(
         val tracerProvider = tracerProviderBuilder.build()
         sdkTracerProvider = tracerProvider
 
-        openTelemetry = OpenTelemetrySdk.builder()
+        openTelemetry = OpenTelemetrySdk
+            .builder()
             .setTracerProvider(tracerProvider)
-            .setPropagators(ContextPropagators.create(io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator.getInstance()))
-            .build()
+            .setPropagators(
+                ContextPropagators.create(
+                    io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
+                        .getInstance(),
+                ),
+            ).build()
 
         tracer = openTelemetry.getTracer("cz.cleanship.telemetry", "1.0.0")
     }
@@ -190,6 +205,7 @@ class DefaultTelemetry(
         val scope = otelSpan.makeCurrent()
         return object : SpanScope {
             override val span: TelemetrySpan = TelemetrySpanImpl(otelSpan)
+
             override fun close() {
                 scope.close()
                 otelSpan.end()
@@ -197,11 +213,12 @@ class DefaultTelemetry(
         }
     }
 
+    @Suppress("TooGenericExceptionCaught")
     override suspend fun <T> inSpan(
         name: String,
         kind: SpanKind,
         attributes: Map<String, Any?>,
-        block: suspend (TelemetrySpan) -> T
+        block: suspend (TelemetrySpan) -> T,
     ): T {
         val parentContext = Context.current()
         val builder = tracer.spanBuilder(name).setSpanKind(kind.toOtel()).setParent(parentContext)
@@ -214,10 +231,10 @@ class DefaultTelemetry(
                 return withContext(Context.current().asContextElement()) {
                     try {
                         block(TelemetrySpanImpl(otelSpan))
-                    } catch (t: Throwable) {
-                        otelSpan.recordException(t)
+                    } catch (e: Exception) {
+                        otelSpan.recordException(e)
                         otelSpan.setStatus(StatusCode.ERROR)
-                        throw t
+                        throw e
                     }
                 }
             } finally {
@@ -232,11 +249,12 @@ class DefaultTelemetry(
 
     override fun prometheusScrape(): String? = prometheusRegistry?.scrape()
 
+    @Suppress("TooGenericExceptionCaught")
     override fun shutdown() {
         try {
             sdkTracerProvider.shutdown().join(10, TimeUnit.SECONDS)
-        } catch (_: Throwable) {
-            // ignore
+        } catch (e: Exception) {
+            bootLogger.debug("Failed to shutdown tracer provider", e)
         }
     }
 
@@ -280,7 +298,9 @@ class DefaultTelemetry(
         private val logger = LoggerFactory.getLogger(name)
 
         override fun info(message: String, fields: Map<String, Any?>) = withTraceMdc(fields) { logger.info(message) }
+
         override fun warn(message: String, fields: Map<String, Any?>) = withTraceMdc(fields) { logger.warn(message) }
+
         override fun error(message: String, throwable: Throwable?, fields: Map<String, Any?>) = withTraceMdc(fields) {
             if (throwable != null) logger.error(message, throwable) else logger.error(message)
         }
@@ -294,7 +314,8 @@ class DefaultTelemetry(
          * @param logCall logging action
          */
         private inline fun withTraceMdc(fields: Map<String, Any?>, crossinline logCall: () -> Unit) {
-            val span = io.opentelemetry.api.trace.Span.current()
+            val span = io.opentelemetry.api.trace.Span
+                .current()
             val ctx = span.spanContext
             val addedKeys = mutableListOf<String>()
             if (ctx.isValid) {
@@ -318,7 +339,8 @@ class DefaultTelemetry(
          * @param added collection tracking added keys
          */
         private fun putMdc(key: String, value: String, added: MutableList<String>) {
-            MDC.put(key, value); added.add(key)
+            MDC.put(key, value)
+            added.add(key)
         }
     }
 

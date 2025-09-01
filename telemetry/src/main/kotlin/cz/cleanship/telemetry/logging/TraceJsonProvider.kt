@@ -6,20 +6,19 @@ import net.logstash.logback.composite.AbstractJsonProvider
 import ch.qos.logback.classic.spi.ILoggingEvent
 
 /**
- * Logstash JSON provider that adds trace_id and span_id fields from the current OpenTelemetry span.
- * This requires logstash-logback-encoder and configuration in logback.xml:
+ * Logstash provider that writes `trace_id` and `span_id` from the current OpenTelemetry span.
  *
- * <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
- *   <providers>
- *     <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
- *     <message/>
- *     <loggerName/>
- *     <threadName/>
- *     <mdc/> <!-- optional -->
- *   </providers>
- * </encoder>
+ * Use with logstash-logback-encoder when provider-based JSON enrichment is preferred.
+ *
+ * @see cz.cleanship.telemetry.TelemetryLogger
  */
 class TraceJsonProvider : AbstractJsonProvider<ILoggingEvent>() {
+    /**
+     * Writes `trace_id` and `span_id` if a valid span exists.
+     *
+     * @param generator the JSON generator
+     * @param event the logging event
+     */
     override fun writeTo(generator: JsonGenerator, event: ILoggingEvent) {
         val ctx = Span.current().spanContext
         if (ctx.isValid) {

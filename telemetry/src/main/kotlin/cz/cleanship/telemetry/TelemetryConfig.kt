@@ -1,8 +1,15 @@
 package cz.cleanship.telemetry
 
 /**
- * Configuration for the telemetry module. Values can be constructed from environment variables
- * and/or system properties using [fromEnvironment].
+ * Configuration for the telemetry module.
+ *
+ * Values can be constructed from environment variables and/or system properties
+ * using [fromEnvironment].
+ *
+ * @property serviceName logical service name reported to backends
+ * @property tracesExporter trace exporter selection
+ * @property metricsExporter metrics exporter selection
+ * @property otlpEndpoint OTLP endpoint URL when OTLP exporters are used
  */
 data class TelemetryConfig(
     val serviceName: String = System.getProperty("telemetry.service.name")
@@ -18,10 +25,16 @@ data class TelemetryConfig(
         ?: System.getenv("TELEMETRY_OTLP_ENDPOINT"),
 ) {
     companion object {
+        /**
+         * Creates configuration from environment variables and system properties.
+         *
+         * @return a configuration instance
+         */
         fun fromEnvironment(): TelemetryConfig = TelemetryConfig()
     }
 }
 
+/** Trace exporter selection. */
 enum class TracesExporter(val id: String) {
     NONE("none"),
     LOGGING("logging"),
@@ -29,6 +42,12 @@ enum class TracesExporter(val id: String) {
     INMEMORY_FOR_TESTS("inmemory");
 
     companion object {
+        /**
+         * Parses a [value] to a [TracesExporter].
+         *
+         * @param value exporter id (case-insensitive)
+         * @return the matching exporter or [NONE] if unmatched or null
+         */
         fun from(value: String?): TracesExporter = when (value?.lowercase()) {
             LOGGING.id -> LOGGING
             OTLP.id -> OTLP
@@ -38,6 +57,7 @@ enum class TracesExporter(val id: String) {
     }
 }
 
+/** Metrics exporter selection. */
 enum class MetricsExporter(val id: String) {
     NONE("none"),
     PROMETHEUS("prometheus"),
@@ -45,6 +65,12 @@ enum class MetricsExporter(val id: String) {
     LOGGING("logging");
 
     companion object {
+        /**
+         * Parses a [value] to a [MetricsExporter].
+         *
+         * @param value exporter id (case-insensitive)
+         * @return the matching exporter or [NONE] if unmatched or null
+         */
         fun from(value: String?): MetricsExporter = when (value?.lowercase()) {
             PROMETHEUS.id -> PROMETHEUS
             OTLP.id -> OTLP
@@ -53,3 +79,4 @@ enum class MetricsExporter(val id: String) {
         }
     }
 }
+

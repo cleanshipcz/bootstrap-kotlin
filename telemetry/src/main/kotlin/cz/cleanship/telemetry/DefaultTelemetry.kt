@@ -33,6 +33,12 @@ import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
 
+/**
+ * Default implementation of [TelemetryFacade] using OpenTelemetry and Micrometer.
+ *
+ * @param config telemetry configuration
+ * @param testSpanExporter optional span exporter used for tests
+ */
 class DefaultTelemetry(
     private val config: TelemetryConfig = TelemetryConfig.fromEnvironment(),
     private val testSpanExporter: SpanExporter? = null,
@@ -256,7 +262,11 @@ class DefaultTelemetry(
         }
     }
 
-    // Logger implementation that injects trace/span IDs via MDC for the duration of the call.
+    /**
+     * SLF4J-backed logger that adds `trace_id` and `span_id` to MDC for each call.
+     *
+     * @param name SLF4J logger name
+     */
     private class TelemetryLoggerImpl(name: String) : TelemetryLogger {
         private val logger = LoggerFactory.getLogger(name)
 
@@ -268,6 +278,12 @@ class DefaultTelemetry(
 
         override fun debug(message: String, fields: Map<String, Any?>) = withTraceMdc(fields) { logger.debug(message) }
 
+        /**
+         * Executes [logCall] with temporary MDC entries.
+         *
+         * @param fields structured fields to add for this call
+         * @param logCall logging action
+         */
         private inline fun withTraceMdc(fields: Map<String, Any?>, crossinline logCall: () -> Unit) {
             val span = io.opentelemetry.api.trace.Span.current()
             val ctx = span.spanContext
@@ -277,14 +293,18 @@ class DefaultTelemetry(
                 putMdc("span_id", ctx.spanId, addedKeys)
             }
             for ((k, v) in fields) putMdc(k, v?.toString() ?: "null", addedKeys)
-            try {
-                logCall()
-            } finally {
+            try { logCall() } finally {
                 // Clean up keys we added to MDC to avoid leaking state across threads
                 for (k in addedKeys) MDC.remove(k)
             }
         }
-
+        /**
+         * Adds a key/value to MDC and tracks it for cleanup.
+         *
+         * @param key MDC key
+         * @param value MDC value
+         * @param added collection tracking added keys
+         */
         private fun putMdc(key: String, value: String, added: MutableList<String>) {
             MDC.put(key, value); added.add(key)
         }

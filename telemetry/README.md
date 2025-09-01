@@ -43,17 +43,7 @@ fun main() {
 - TELEMETRY_EXPORTER_TRACES / -Dtelemetry.traces.exporter: `none` | `logging` | `otlp` | `inmemory`
 - TELEMETRY_EXPORTER_METRICS / -Dtelemetry.metrics.exporter: `none` | `prometheus` | `otlp` | `logging`
 - TELEMETRY_OTLP_ENDPOINT / -Dtelemetry.otlp.endpoint (default: none; example: `http://localhost:4318`)
-
-Examples:
-```bash
-# Log spans to stdout, metrics to Prometheus registry (expose via HTTP yourself)
-export TELEMETRY_EXPORTER_TRACES=logging
-export TELEMETRY_EXPORTER_METRICS=prometheus
-
-# OTLP to Grafana Tempo/OTel Collector
-export TELEMETRY_EXPORTER_TRACES=otlp
-export TELEMETRY_OTLP_ENDPOINT=http://otel-collector:4318
-```
+See “Exporter selection and typical setups” below for concrete configurations.
 
 ## Exporter selection and typical setups
 
@@ -109,7 +99,13 @@ fun metricsHandler(): String = appTelemetry.prometheusScrape() ?: "prometheus ex
 - Spring Boot: create a simple controller mapping `/metrics` and return the scrape string.
 
 ## Structured JSON logging (Logback)
-Add a `logback.xml` (or `logback-test.xml`) with Logstash JSON encoder and the provided `TraceJsonProvider`:
+
+Choose one of the following approaches:
+
+### Option A: MDC-based (recommended)
+- `telemetry.logger(name)` injects `trace_id` and `span_id` into MDC for each call.
+- Include `<mdc/>` in your JSON providers.
+
 ```xml
 <configuration>
   <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
@@ -121,6 +117,30 @@ Add a `logback.xml` (or `logback-test.xml`) with Logstash JSON encoder and the p
         <logLevel/>
         <message/>
         <mdc/>
+      </providers>
+    </encoder>
+  </appender>
+  <root level="INFO">
+    <appender-ref ref="STDOUT"/>
+  </root>
+</configuration>
+```
+
+### Option B: Provider-based
+- Add `cz.cleanship.telemetry.logging.TraceJsonProvider` to write `trace_id`/`span_id` directly.
+- Omit `<mdc/>` to avoid duplicate fields, or keep it if you need other MDC entries.
+
+```xml
+<configuration>
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+      <providers>
+        <timestamp/>
+        <loggerName/>
+        <threadName/>
+        <logLevel/>
+        <message/>
+        <!-- <mdc/>  Uncomment if you also need MDC fields (beware of duplicates) -->
         <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
       </providers>
     </encoder>
@@ -130,7 +150,6 @@ Add a `logback.xml` (or `logback-test.xml`) with Logstash JSON encoder and the p
   </root>
 </configuration>
 ```
-This will include `trace_id` and `span_id` fields for logs emitted inside spans.
 
 ## Testing
 Run tests (module only):
@@ -138,8 +157,8 @@ Run tests (module only):
 ./gradlew :telemetry:test
 ```
 The suite uses:
-- InMemorySpanExporter for spans
-- Micrometer registry introspection
+- LocalInMemorySpanExporter for spans
+- Micrometer Search API for metric assertions
 - Logback ListAppender for log assertions
 
 ## Notes

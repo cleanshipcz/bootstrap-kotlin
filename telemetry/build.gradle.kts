@@ -28,4 +28,5 @@ dependencies {
     testImplementation(libs.opentelemetrySdkTesting)
     testImplementation(libs.kotlinxCoroutinesTest)
     testImplementation(libs.logbackClassic)
+    testImplementation(libs.mockk)
 }

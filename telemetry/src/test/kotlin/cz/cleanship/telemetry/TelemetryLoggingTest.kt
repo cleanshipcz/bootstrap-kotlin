@@ -2,12 +2,15 @@ package cz.cleanship.telemetry
 
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
-import ch.qos.logback.core.read.ListAppender
+import ch.qos.logback.core.OutputStreamAppender
+import cz.cleanship.telemetry.logging.TraceJsonProvider
 import kotlinx.coroutines.test.runTest
-import org.junit.jupiter.api.Assertions.assertNotNull
+import net.logstash.logback.composite.loggingevent.LoggingEventJsonProviders
+import net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import java.io.ByteArrayOutputStream
 
 class TelemetryLoggingTest {
 
@@ -22,27 +25,36 @@ class TelemetryLoggingTest {
     }
 
     @Test
-    fun `logs inside spans include trace and span ids via MDC`() = runTest {
+    fun `logs inside spans include trace and span ids via TraceJsonProvider`() = runTest {
         val telemetry = createTelemetry()
         val loggerName = "telemetry.test"
 
         val slf4jLogger = LoggerFactory.getLogger(loggerName) as Logger
-        val appender = ListAppender<ILoggingEvent>()
+        val ctx = slf4jLogger.loggerContext
+
+        // Configure JSON encoder with our provider
+        val encoder = LoggingEventCompositeJsonEncoder()
+        encoder.context = ctx
+        val providers = LoggingEventJsonProviders()
+        providers.addProvider(TraceJsonProvider())
+        encoder.setProviders(providers)
+        encoder.start()
+
+        // Capture output into a byte array
+        val baos = ByteArrayOutputStream()
+        val appender = object : OutputStreamAppender<ILoggingEvent>() {}
+        appender.context = ctx
+        appender.encoder = encoder
+        appender.outputStream = baos
         appender.start()
         slf4jLogger.addAppender(appender)
 
         telemetry.inSpan("logging-span") { _ ->
-            telemetry.logger(loggerName).info("hello", mapOf("foo" to "bar"))
+            slf4jLogger.atInfo().addKeyValue("foo", "bar").log("hello")
         }
 
-        val events = appender.list
-        assertTrue(events.isNotEmpty())
-        val event = events.last()
-
-        val mdc = event.mdcPropertyMap
-        val traceId = mdc["trace_id"]
-        val spanId = mdc["span_id"]
-        assertNotNull(traceId)
-        assertNotNull(spanId)
+        val json = baos.toString("UTF-8")
+        assertTrue(json.contains("trace_id"), "JSON should contain trace_id")
+        assertTrue(json.contains("span_id"), "JSON should contain span_id")
     }
 }

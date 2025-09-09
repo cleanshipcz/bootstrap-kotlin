@@ -9,8 +9,6 @@ import net.logstash.logback.composite.AbstractJsonProvider
  * Logstash provider that writes `trace_id` and `span_id` from the current OpenTelemetry span.
  *
  * Use with logstash-logback-encoder when provider-based JSON enrichment is preferred.
- *
- * @see cz.cleanship.telemetry.TelemetryLogger
  */
 class TraceJsonProvider : AbstractJsonProvider<ILoggingEvent>() {
     /**

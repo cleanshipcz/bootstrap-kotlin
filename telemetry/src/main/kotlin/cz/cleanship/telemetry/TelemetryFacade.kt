@@ -1,7 +1,7 @@
 package cz.cleanship.telemetry
 
 /**
- * Framework-agnostic facade over tracing, metrics, and logging.
+ * Framework-agnostic facade over tracing and metrics.
  * Application code should depend only on this interface, not on vendor SDKs.
  */
 interface TelemetryFacade {
@@ -75,20 +75,6 @@ interface TelemetryFacade {
         block: suspend (TelemetrySpan) -> T,
     ): T
 
-    // ---- Logging ----
-
-    /**
-     * Returns a structured logger bound to the given name.
-     *
-     * The returned logger adds the current trace and span IDs (when present) to MDC for each call
-     * and supports per-call structured fields.
-     *
-     * @param name the SLF4J logger name
-     * @return a logger that enriches MDC with tracing identifiers
-     * @see TelemetryLogger
-     */
-    fun logger(name: String): TelemetryLogger
-
     // ---- Exporters / Utilities ----
 
     /**
@@ -146,48 +132,6 @@ interface SpanScope : AutoCloseable {
 
     /** Ends the span and restores the previous context. */
     override fun close()
-}
-
-/**
- * Structured logger that enriches SLF4J MDC with trace and span IDs when available.
- *
- * All MDC entries added by a logging call are removed afterwards.
- *
- * @see cz.cleanship.telemetry.logging.TraceJsonProvider
- */
-interface TelemetryLogger {
-    /**
-     * Logs at INFO level.
-     *
-     * @param message the log message
-     * @param fields structured fields added to MDC for this call
-     */
-    fun info(message: String, fields: Map<String, Any?> = emptyMap())
-
-    /**
-     * Logs at WARN level.
-     *
-     * @param message the log message
-     * @param fields structured fields added to MDC for this call
-     */
-    fun warn(message: String, fields: Map<String, Any?> = emptyMap())
-
-    /**
-     * Logs at ERROR level.
-     *
-     * @param message the log message
-     * @param throwable optional error to log
-     * @param fields structured fields added to MDC for this call
-     */
-    fun error(message: String, throwable: Throwable? = null, fields: Map<String, Any?> = emptyMap())
-
-    /**
-     * Logs at DEBUG level.
-     *
-     * @param message the log message
-     * @param fields structured fields added to MDC for this call
-     */
-    fun debug(message: String, fields: Map<String, Any?> = emptyMap())
 }
 
 /**

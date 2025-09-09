@@ -1,15 +1,29 @@
 # Telemetry Module
 
-A framework-agnostic telemetry facade for Kotlin apps. It hides vendor SDKs (OpenTelemetry, Micrometer, SLF4J/Logback)
-behind a simple API and supports configuration-driven exporters for Prometheus (metrics), OTLP (Tempo traces, OTEL
-metrics), and JSON logging (ready for Loki ingestion). Works in plain Kotlin, Ktor, or Spring Boot.
+A framework-agnostic telemetry facade for Kotlin apps. It hides vendor SDKs (OpenTelemetry, Micrometer)
+behind a simple API and supports configuration-driven exporters for Prometheus (metrics) and OTLP (Tempo traces, OTEL
+metrics). For logging, use standard SLF4J 2.x with Logback and the provided `TraceJsonProvider` to correlate logs with traces.
 
 ## Features
 
 - Tracing via OpenTelemetry with W3C Trace Context propagation.
 - Metrics via Micrometer: counters, timers, gauges. Prometheus-compatible naming/labels.
-- Structured logging via SLF4J/Logback JSON with automatic `trace_id` and `span_id` (no manual MDC).
+- Log correlation via SLF4J/Logback JSON with automatic `trace_id` and `span_id` via `TraceJsonProvider` (no MDC). See [Structured JSON logging (Logback)](#structured-json-logging-logback).
 - Configurable exporters via env vars / system properties.
+
+## Table of contents
+
+- [Gradle](#gradle)
+- [Quick start](#quick-start)
+- [Usage patterns and examples](#usage-patterns-and-examples)
+- [Configuration](#configuration-env-or--d-system-properties)
+- [Exporter selection and typical setups](#exporter-selection-and-typical-setups)
+- [What prints to STDOUT vs what is sent](#what-prints-to-stdout-vs-what-is-sent)
+- [Structured JSON logging (Logback)](#structured-json-logging-logback)
+- [Using the sample Logback config](#using-the-sample-logback-config)
+- [Extending and customizing logging](#extending-and-customizing-logging)
+- [Gotchas](#gotchas)
+- [Testing](#testing)
 
 ## Gradle
 
@@ -25,10 +39,11 @@ dependencies {
 
 ```kotlin
 import cz.cleanship.telemetry.*
+import org.slf4j.LoggerFactory
 
 fun main() {
     val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
-    val log = telemetry.logger("example.app")
+    val log = LoggerFactory.getLogger("example.app")
 
     val requests = telemetry.counter("http_requests_total", mapOf("method" to "GET"))
 
@@ -39,10 +54,144 @@ fun main() {
             // do work
         }
         telemetry.gauge("queue_depth").set(3.0)
-        log.info("Handled request", mapOf("user" to 42))
+        // SLF4J 2.x event API for structured logging
+        log.atInfo().addKeyValue("user", 42).log("Handled request")
     }
 }
 ```
+
+## Usage patterns and examples
+
+### 1) Request handling: trace + metrics + structured logs
+
+```kotlin
+import cz.cleanship.telemetry.*
+import org.slf4j.LoggerFactory
+
+val telemetry = Telemetry.create()
+val log = LoggerFactory.getLogger("app.http")
+val httpRequests = telemetry.counter("http_requests_total")
+val requestLatency = telemetry.timer("http_request_duration_ms")
+
+suspend fun handleRequest(method: String, route: String) {
+    telemetry.inSpan("http.server.request", SpanKind.SERVER, mapOf(
+        "http.method" to method,
+        "http.route" to route,
+    )) {
+        httpRequests.increment()
+        requestLatency.recordSuspend {
+            // your business logic here
+        }
+        log.atInfo().addKeyValue("method", method).addKeyValue("route", route).log("Handled request")
+    }
+}
+```
+
+Why this pattern:
+- Tracing gives per-request diagnostics and causality.
+- The counter and timer provide aggregate visibility for dashboards and alerts.
+- Structured logs add searchable fields without high-cardinality metric labels.
+
+### 2) External call: CLIENT span + latency metric
+
+```kotlin
+val externalLatency = telemetry.timer("external_api_duration_ms", mapOf("service" to "payments"))
+
+suspend fun charge(amount: Long) = telemetry.inSpan(
+    name = "payments.charge",
+    kind = SpanKind.CLIENT,
+    attributes = mapOf("amount" to amount),
+) {
+    externalLatency.recordSuspend {
+        // invoke HTTP client here
+    }
+}
+```
+
+Why this pattern:
+- A CLIENT span clearly marks the outbound dependency in traces.
+- The timer captures latency distribution over time for SLOs and alerting.
+
+### 3) Error logging inside spans
+
+```kotlin
+val log = LoggerFactory.getLogger("app.errors")
+
+suspend fun doWork() = telemetry.inSpan("work") {
+    try {
+        // risky operation
+    } catch (e: Exception) {
+        // inSpan will recordException and set span status=ERROR when rethrowing
+        log.atError().setCause(e).addKeyValue("op", "work").log("Operation failed")
+        throw e
+    }
+}
+```
+
+Why this pattern:
+- The span captures the exception (stack trace, status) for traces.
+- The log provides an immediate alerting/signal channel and searchable context.
+
+### 4) Async/coroutines propagation
+
+`DefaultTelemetry.inSpan` propagates the OpenTelemetry context across coroutines via `Context.asContextElement()`, so any log or nested span inside the `inSpan` block is correlated automatically.
+
+```kotlin
+suspend fun doConcurrent() = telemetry.inSpan("concurrent") {
+    coroutineScope {
+        val a = async { /* logs here include trace/span */ }
+        val b = async { /* spans created here are children of 'concurrent' */ }
+        a.await(); b.await()
+    }
+}
+```
+
+### 5) Optional: map-style logging helpers (SLF4J 2.x)
+
+If you prefer passing fields as a map, the module provides tiny extensions built on the SLF4J 2.x event API:
+
+```kotlin
+import cz.cleanship.telemetry.logging.info
+import cz.cleanship.telemetry.logging.error
+
+val log = LoggerFactory.getLogger("app")
+log.info("Processed order", mapOf("orderId" to 123, "user" to 42))
+log.error("Failed", fields = mapOf("orderId" to 123), t = RuntimeException("boom"))
+```
+
+Reasoning:
+- They delegate to `logger.atXxx().addKeyValue(...)` under the hood; use them if you like map ergonomics.
+- Otherwise, prefer the standard event API directly.
+
+### 6) Framework endpoints: expose Prometheus
+
+Ktor example:
+
+```kotlin
+val telemetry = Telemetry.create()
+
+routing {
+    get("/metrics") {
+        call.respondText(telemetry.prometheusScrape() ?: "prometheus exporter disabled", ContentType.Text.Plain)
+    }
+}
+```
+
+Spring Boot example:
+
+```kotlin
+@RestController
+class MetricsController(private val telemetry: TelemetryFacade = Telemetry.create()) {
+    @GetMapping("/metrics")
+    fun metrics(): ResponseEntity<String> = ResponseEntity.ok(telemetry.prometheusScrape() ?: "prometheus exporter disabled")
+}
+```
+
+### 7) Recommended label hygiene for metrics
+
+- Prefer low-cardinality labels: `http.method`, `http.route` (templated), `status_class`.
+- Avoid labels like user ID, raw URL, request ID (these belong in spans/logs).
+- Use spans for high-cardinality, per-request context; metrics for aggregation and alerting.
 
 ## Configuration (env or -D system properties)
 
@@ -60,7 +209,7 @@ fun main() {
 
 - Traces (`TELEMETRY_EXPORTER_TRACES`)
     - `none`: disable trace export
-    - `logging`: export spans to stdout (LoggingSpanExporter)
+    - `logging`: export spans to stdout (OpenTelemetry LoggingSpanExporter)
     - `otlp`: export spans to an OTLP collector (uses `TELEMETRY_OTLP_ENDPOINT`)
     - `inmemory`: in-memory exporter for tests
 
@@ -75,57 +224,87 @@ Notes
 - Exporters are additive: you can enable multiple for traces and metrics at the same time (the SimpleMeterRegistry is
   always present).
 - Traces and metrics are configured independently.
-- The facade logger (`telemetry.logger(name)`) is independent of exporters and always available.
+- Logging uses standard SLF4J; correlation is added by the Logback JSON provider described below.
 
 Typical configs
 
-- Local dev (console only): `TRACES=logging`, `METRICS=logging`
-- Prod (pull metrics, send traces): `TRACES=otlp`, `METRICS=prometheus`, `OTLP_ENDPOINT=http://collector:4318`
-- Combined (send and see locally): `TRACES=logging,otlp`, `METRICS=prometheus,otlp,logging`
-- Tests: `TRACES=inmemory`, `METRICS=none`
+- Local dev (console only):
+  - `TELEMETRY_EXPORTER_TRACES=logging`
+  - `TELEMETRY_EXPORTER_METRICS=logging`
+- Prod (pull metrics, send traces):
+  - `TELEMETRY_EXPORTER_TRACES=otlp`
+  - `TELEMETRY_EXPORTER_METRICS=prometheus`
+  - `TELEMETRY_OTLP_ENDPOINT=http://collector:4318`
+- Combined (send and see locally):
+  - `TELEMETRY_EXPORTER_TRACES=logging,otlp`
+  - `TELEMETRY_EXPORTER_METRICS=prometheus,otlp,logging`
+- Tests:
+  - `TELEMETRY_EXPORTER_TRACES=inmemory`
+  - `TELEMETRY_EXPORTER_METRICS=none`
 
 ## What prints to STDOUT vs what is sent
 
-- Application logs (always)
-    - Printed by your Logback appenders (e.g., ConsoleAppender).
-    - `telemetry.logger(name)` injects `trace_id`/`span_id` into MDC per call.
-    - Optional `TraceJsonProvider` writes `trace_id`/`span_id` in JSON if added to providers.
+- Application logs
+    - Emitted by Logback appenders. With `TraceJsonProvider` in the JSON encoder, logs inside `telemetry.inSpan { }` include `trace_id`/`span_id`.
 
 - Traces (`TELEMETRY_EXPORTER_TRACES`)
-    - `logging`: printed to STDOUT (OpenTelemetry LoggingSpanExporter).
-    - `otlp`: sent to the collector at `TELEMETRY_OTLP_ENDPOINT`.
-    - `inmemory`: kept in-memory for tests.
-    - `none`: no output.
-    - If you enable multiple (e.g., `logging,otlp`), both happen.
+    - `logging`: spans printed to STDOUT.
+    - `otlp`: spans sent to the collector at `TELEMETRY_OTLP_ENDPOINT`.
+    - `inmemory`: spans kept in-memory for tests.
+    - `none`: disabled.
 
 - Metrics (`TELEMETRY_EXPORTER_METRICS`)
-    - `logging`: periodic metric snapshots printed to STDOUT (LoggingMeterRegistry).
-    - `prometheus`: expose `telemetry.prometheusScrape()` via HTTP and Prometheus pulls it.
-    - `otlp`: pushed to the collector (OtlpMeterRegistry).
-    - `none`: no output.
-    - If you enable multiple (e.g., `prometheus,otlp,logging`), all behaviors apply.
+    - `logging`: periodic snapshots printed to STDOUT.
+    - `prometheus`: expose `telemetry.prometheusScrape()` via HTTP; Prometheus pulls it.
+    - `otlp`: metrics pushed to the collector.
+    - `none`: disabled.
 
-Note: the facade logger API is independent of exporters; it is always available.
+If you enable multiple exporters (e.g., `logging,otlp`), all behaviors apply.
 
-## Exposing Prometheus metrics
-
-- Plain Kotlin/Ktor: add an endpoint and return `telemetry.prometheusScrape()` as text/plain.
-
-```kotlin
-val appTelemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
-fun metricsHandler(): String = appTelemetry.prometheusScrape() ?: "prometheus exporter disabled"
-```
-
-- Spring Boot: create a simple controller mapping `/metrics` and return the scrape string.
+Prometheus endpoint examples: see "Usage patterns and examples" → "Framework endpoints: expose Prometheus".
 
 ## Structured JSON logging (Logback)
 
 Choose one of the following approaches:
 
-### Option A: MDC-based (recommended)
+### Option A: Provider-based (recommended)
 
-- `telemetry.logger(name)` injects `trace_id` and `span_id` into MDC for each call.
-- Include `<mdc/>` in your JSON providers.
+- Add `cz.cleanship.telemetry.logging.TraceJsonProvider` to write `trace_id`/`span_id` directly based on the current OpenTelemetry context.
+- Use SLF4J 2.x event API to add structured fields.
+
+```xml
+
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
+            <providers>
+                <timestamp/>
+                <loggerName/>
+                <threadName/>
+                <logLevel/>
+                <message/>
+                <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
+            </providers>
+        </encoder>
+    </appender>
+    <root level="INFO">
+        <appender-ref ref="STDOUT"/>
+    </root>
+</configuration>
+```
+
+See also: `telemetry/logback.sample.xml` for a minimal reference configuration.
+
+Kotlin logging example with structured fields using SLF4J 2.x:
+
+```kotlin
+val log = LoggerFactory.getLogger("app")
+log.atInfo().addKeyValue("user", 42).addKeyValue("order", 123).log("Processed order")
+```
+
+### Option B: MDC-based (alternative)
+
+- If you prefer MDC, include `<mdc/>` in your JSON providers and manage MDC yourself (or with filters).
 
 ```xml
 
@@ -148,32 +327,122 @@ Choose one of the following approaches:
 </configuration>
 ```
 
-### Option B: Provider-based
+### Using the sample Logback config
 
-- Add `cz.cleanship.telemetry.logging.TraceJsonProvider` to write `trace_id`/`span_id` directly.
-- Omit `<mdc/>` to avoid duplicate fields, or keep it if you need other MDC entries.
+1. Copy `telemetry/logback.sample.xml` into your application as `src/main/resources/logback.xml`.
+2. Ensure your application module declares logging dependencies:
+
+```kotlin
+dependencies {
+    implementation(libs.logbackClassic)
+    implementation(libs.logstashLogbackEncoder)
+}
+```
+
+3. Start your app. Logs will be JSON on STDOUT and include `trace_id`/`span_id` when emitted inside `telemetry.inSpan { ... }`.
+
+## Extending and customizing logging
+
+You can add more context to logs in two simple ways:
+
+### A) MDC (Mapped Diagnostic Context)
+
+Use MDC for fields that should appear on every log within a scope (including logs from third‑party libraries) when your encoder prints `<mdc/>`.
+
+```kotlin
+import org.slf4j.MDC
+
+fun handleRequest(reqId: String) {
+    MDC.putCloseable("request_id", reqId).use {
+        log.atInfo().log("Start")
+        // ... other code (including library logs) will include request_id
+        log.atInfo().log("Done")
+    } // request_id removed automatically
+}
+```
+
+Notes:
+- MDC is thread‑local; in coroutines, execution may hop threads. If you need MDC across coroutines, consider `kotlinx-coroutines-slf4j` and wrap blocks with `MDCContext(MDC.getCopyOfContextMap())`.
+- Keep MDC keys low‑cardinality and non‑sensitive; they are printed on every log when `<mdc/>` is enabled.
+
+MDC with coroutines (kotlinx‑coroutines‑slf4j)
+
+Add the dependency to your application module (align the version with your coroutines):
+
+```kotlin
+dependencies {
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-slf4j:1.10.2")
+}
+```
+
+Propagate MDC into coroutine blocks:
+
+```kotlin
+import kotlinx.coroutines.slf4j.MDCContext
+import kotlinx.coroutines.withContext
+import org.slf4j.MDC
+
+suspend fun handleRequest(reqId: String) {
+    MDC.putCloseable("request_id", reqId).use {
+        // Capture current MDC and propagate within this coroutine scope
+        withContext(MDCContext()) {
+            log.atInfo().log("Start")
+            // ... other suspending work; logs include request_id if <mdc/> is enabled
+            log.atInfo().log("Done")
+        }
+    }
+}
+```
+
+### B) Custom JSON providers
+
+For fields derived at encode time (no MDC), implement a provider:
+
+```kotlin
+class EnvJsonProvider : AbstractJsonProvider<ILoggingEvent>() {
+    override fun writeTo(generator: JsonGenerator, event: ILoggingEvent) {
+        generator.writeStringField("env", System.getenv("ENV") ?: "dev")
+    }
+}
+```
+
+Register it in Logback alongside `TraceJsonProvider`:
 
 ```xml
-
-<configuration>
-    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
-        <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
-            <providers>
-                <timestamp/>
-                <loggerName/>
-                <threadName/>
-                <logLevel/>
-                <message/>
-                <!-- <mdc/>  Uncomment if you also need MDC fields (beware of duplicates) -->
-                <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
-            </providers>
-        </encoder>
-    </appender>
-    <root level="INFO">
-        <appender-ref ref="STDOUT"/>
-    </root>
-</configuration>
+<providers>
+    <timestamp/>
+    <loggerName/>
+    <threadName/>
+    <logLevel/>
+    <message/>
+    <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
+    <provider class="com.example.logging.EnvJsonProvider"/>
+    <!-- or <mdc/> if you rely on MDC -->
+ </providers>
 ```
+
+When to use what:
+- Use `TraceJsonProvider` for `trace_id`/`span_id` (no MDC needed).
+- Use SLF4J 2.x event API for per‑log structured fields (`addKeyValue`).
+- Use MDC for ambient fields you want on every log in a scope, including third‑party logs.
+
+## Gotchas
+
+- Log correlation requires the provider
+  - Add `cz.cleanship.telemetry.logging.TraceJsonProvider` to your Logback JSON encoder providers. Without it (or MDC), `trace_id`/`span_id` will not be written.
+  - The provider works with JSON encoders (e.g., logstash-logback-encoder). It does not affect plain pattern layouts.
+- Context propagation
+  - Inside `telemetry.inSpan { ... }` the span is set as current and is propagated across coroutines via `Context.asContextElement()`.
+  - If you spawn threads or leave the `inSpan` scope, propagate OTel Context manually if you still need correlation.
+- SLF4J API level
+  - Examples use SLF4J 2.x event API (`logger.atInfo().addKeyValue(...)`). With Logback 1.5.x this is available by default.
+  - If stuck on older SLF4J, consider `StructuredArguments` from logstash-logback-encoder as an alternative for structured fields.
+- MDC is optional
+  - The provider reads the current OTel context directly; you do not need MDC for trace/span correlation.
+  - If you choose to rely on MDC for other reasons, include `<mdc/>` in providers and manage MDC entries carefully.
+- Metric label cardinality
+  - Keep metric labels low-cardinality (e.g., `http.method`, `http.route`, `status_class`). Avoid user IDs, raw URLs, etc.
+  - Use spans for high-cardinality diagnostic data; use metrics for aggregation and alerting.
 
 ## Testing
 
@@ -187,10 +456,4 @@ The suite uses:
 
 - LocalInMemorySpanExporter for spans
 - Micrometer Search API for metric assertions
-- Logback ListAppender for log assertions
-
-## Notes
-
-- The facade (`TelemetryFacade`) shields application code from vendor APIs.
-- Context propagation across coroutines is handled via OpenTelemetry `Context.asContextElement()`.
-- Use `Telemetry.create()` to instantiate the default implementation.
+- Logback JSON encoder with `TraceJsonProvider` for log correlation assertions

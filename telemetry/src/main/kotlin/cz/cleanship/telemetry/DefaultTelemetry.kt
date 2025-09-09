@@ -28,7 +28,6 @@ import io.opentelemetry.sdk.trace.export.SimpleSpanProcessor
 import io.opentelemetry.sdk.trace.export.SpanExporter
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import org.slf4j.MDC
 import java.time.Duration
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicReference
@@ -245,8 +244,6 @@ class DefaultTelemetry(
         }
     }
 
-    override fun logger(name: String): TelemetryLogger = TelemetryLoggerImpl(name)
-
     override fun prometheusScrape(): String? = prometheusRegistry?.scrape()
 
     @Suppress("TooGenericExceptionCaught")
@@ -286,61 +283,6 @@ class DefaultTelemetry(
                 is Float -> builder.setAttribute(AttributeKey.doubleKey(k), v.toDouble())
                 else -> builder.setAttribute(AttributeKey.stringKey(k), v.toString())
             }
-        }
-    }
-
-    /**
-     * SLF4J-backed logger that adds `trace_id` and `span_id` to MDC for each call.
-     *
-     * @param name SLF4J logger name
-     */
-    private class TelemetryLoggerImpl(name: String) : TelemetryLogger {
-        private val logger = LoggerFactory.getLogger(name)
-
-        override fun info(message: String, fields: Map<String, Any?>) = withTraceMdc(fields) { logger.info(message) }
-
-        override fun warn(message: String, fields: Map<String, Any?>) = withTraceMdc(fields) { logger.warn(message) }
-
-        override fun error(message: String, throwable: Throwable?, fields: Map<String, Any?>) = withTraceMdc(fields) {
-            if (throwable != null) logger.error(message, throwable) else logger.error(message)
-        }
-
-        override fun debug(message: String, fields: Map<String, Any?>) = withTraceMdc(fields) { logger.debug(message) }
-
-        /**
-         * Executes [logCall] with temporary MDC entries.
-         *
-         * @param fields structured fields to add for this call
-         * @param logCall logging action
-         */
-        private inline fun withTraceMdc(fields: Map<String, Any?>, crossinline logCall: () -> Unit) {
-            val span = io.opentelemetry.api.trace.Span
-                .current()
-            val ctx = span.spanContext
-            val addedKeys = mutableListOf<String>()
-            if (ctx.isValid) {
-                putMdc("trace_id", ctx.traceId, addedKeys)
-                putMdc("span_id", ctx.spanId, addedKeys)
-            }
-            for ((k, v) in fields) putMdc(k, v?.toString() ?: "null", addedKeys)
-            try {
-                logCall()
-            } finally {
-                // Clean up keys we added to MDC to avoid leaking state across threads
-                for (k in addedKeys) MDC.remove(k)
-            }
-        }
-
-        /**
-         * Adds a key/value to MDC and tracks it for cleanup.
-         *
-         * @param key MDC key
-         * @param value MDC value
-         * @param added collection tracking added keys
-         */
-        private fun putMdc(key: String, value: String, added: MutableList<String>) {
-            MDC.put(key, value)
-            added.add(key)
         }
     }
 

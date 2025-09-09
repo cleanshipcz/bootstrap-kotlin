@@ -7,6 +7,7 @@ import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.withType
 import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import io.gitlab.arturbosch.detekt.Detekt
+import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
 
 class KotlinJvmConventionPlugin : Plugin<Project> {
     override fun apply(target: Project) {
@@ -16,6 +17,7 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
             apply(plugin = "org.jetbrains.kotlin.jvm")
             apply(plugin = "org.jlleitschuh.gradle.ktlint")
             apply(plugin = "io.gitlab.arturbosch.detekt")
+            apply(plugin = "jacoco")
 
             extensions.configure(org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension::class.java) {
                 jvmToolchain(21)
@@ -25,6 +27,7 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
             extensions.configure(org.jlleitschuh.gradle.ktlint.KtlintExtension::class.java) {
                 version.set(libs.findVersion("ktlint").get().toString())
                 filter { exclude("**/generated/**") }
+                reporters { reporter(ReporterType.CHECKSTYLE) }
             }
 
             // Detekt
@@ -47,12 +50,29 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
                 testLogging {
                     events(TestLogEvent.FAILED, TestLogEvent.PASSED, TestLogEvent.SKIPPED)
                 }
+                // Ensure coverage is generated after tests
+                finalizedBy(tasks.named("jacocoTestReport"))
             }
             tasks.withType<Detekt>().configureEach {
                 jvmTarget = "21"
+                reports {
+                    xml.required.set(true)
+                    sarif.required.set(true)
+                    html.required.set(false)
+                    txt.required.set(false)
+                }
             }
-            tasks.named("check").configure { dependsOn("ktlintCheck", "detekt") }
+            // Configure JaCoCo XML reports for SonarCloud
+            tasks.withType<org.gradle.testing.jacoco.tasks.JacocoReport>().configureEach {
+                reports {
+                    xml.required.set(true)
+                    html.required.set(true)
+                }
+            }
+
+            tasks.named("check").configure { dependsOn("ktlintCheck", "detekt", "jacocoTestReport") }
         }
     }
 }
+
 

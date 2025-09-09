@@ -7,11 +7,17 @@ package cz.cleanship.telemetry
 interface TelemetryFacade {
     // ---- Metrics ----
     /**
-     * Returns a counter.
+     * Returns a counter handle used to count occurrences of discrete events (monotonically increasing).
      *
-     * @param name metric name
-     * @param tags metric tags
-     * @return a handle to increment the counter
+     * @param name stable metric name identifying the time series. Choose a descriptive, low-cardinality
+     * name (e.g., "http_server_requests_total"). The name is combined with [tags] to form distinct
+     * time series in backends.
+     * @param tags dimensional labels for the series (e.g., method=GET, status=200). Using the same
+     * [name] with different tag sets creates separate series; using the same [name] and identical
+     * tag set contributes to the same series. Be cautious with tag cardinality.
+     * @return a handle to increment the counter; call [CounterHandle.increment] when the event occurs.
+     * @see timer
+     * @see gauge
      */
     fun counter(
         name: String,
@@ -19,11 +25,17 @@ interface TelemetryFacade {
     ): CounterHandle
 
     /**
-     * Returns a timer.
+     * Returns a timer handle used to record durations/latency of operations.
      *
-     * @param name metric name
-     * @param tags metric tags
-     * @return a handle to record durations
+     * @param name stable metric name for latency measurement (e.g., "db_query_latency"). The name is
+     * combined with [tags] to identify the series.
+     * @param tags dimensional labels for breaking down latency (e.g., query=select_user). As with
+     * counters, same [name] + equal [tags] aggregate together; different tags produce separate series.
+     * @return a handle to record durations via [TimerHandle.record] or to time suspending work via
+     * [TimerHandle.recordSuspend]. Common use cases include measuring HTTP handler latency, DB calls,
+     * or RPC round-trips.
+     * @see counter
+     * @see gauge
      */
     fun timer(
         name: String,
@@ -31,11 +43,16 @@ interface TelemetryFacade {
     ): TimerHandle
 
     /**
-     * Returns a gauge.
+     * Returns a gauge handle representing a value at a point in time (last-set-wins).
      *
-     * @param name metric name
-     * @param tags metric tags
-     * @return a handle to set gauge values
+     * @param name stable metric name for the gauge (e.g., "queue_depth", "cache_size"). The name is
+     * combined with [tags] to identify the series.
+     * @param tags dimensional labels for the gauge series (e.g., queue=payments). Same rules as above
+     * apply: same [name] + equal [tags] update the same series.
+     * @return a handle to set gauge values via [GaugeHandle.set]. Typical use cases include queue sizes,
+     * pool utilization, and cache metrics.
+     * @see counter
+     * @see timer
      */
     fun gauge(
         name: String,
@@ -45,12 +62,14 @@ interface TelemetryFacade {
     // ---- Tracing ----
 
     /**
-     * Starts a span and makes it current.
+     * Starts a span and makes it current until the returned scope is closed.
      *
-     * @param name span name
-     * @param kind span kind
-     * @param attributes attributes to set on the span
-     * @return a scope representing the active span
+     * @param name operation name shown in tracing backends (keep stable and descriptive, e.g.,
+     * "order.create").
+     * @param kind span kind (INTERNAL by default); choose SERVER/CLIENT/PRODUCER/CONSUMER when relevant.
+     * @param attributes initial attributes added to the span (low-cardinality keys such as user_id,
+     * component, route). Values are recorded with appropriate types.
+     * @return a [SpanScope] that must be closed to end the span (use `use`/`try-finally`).
      * @see inSpan
      */
     fun startSpan(
@@ -60,13 +79,17 @@ interface TelemetryFacade {
     ): SpanScope
 
     /**
-     * Runs [block] within a new span and returns its result.
+     * Runs [block] within a new span and returns the result of [block]. Exceptions thrown by [block]
+     * are recorded on the span and rethrown.
      *
-     * @param name span name
-     * @param kind span kind
-     * @param attributes attributes to set on the span
-     * @param block suspending work executed within the span; receives the created span
-     * @return the result of [block]
+     * @param name operation name for the new span.
+     * @param kind span kind.
+     * @param attributes initial attributes for the span.
+     * @param block suspending work executed within the span; receives the created span for optional
+     * enrichment (e.g., add events/attributes).
+     * @return the result of [block]; use this when you need the function result in addition to tracing.
+     * Typical use cases include wrapping service calls, database operations, or external requests where
+     * you want both latency visibility and the computed result.
      */
     suspend fun <T> inSpan(
         name: String,
@@ -90,32 +113,51 @@ interface TelemetryFacade {
 
 // ------------ Handles ------------
 
+/**
+ * Monotonically increasing counter handle bound to a specific metric series.
+ *
+ * Use cases: requests, retries, errors, cache hits/misses, processed items.
+ * Thread-safe; reuse on hot paths.
+ */
 interface CounterHandle {
     /**
-     * Increments the counter by [amount].
+     * Increments the counter.
      *
-     * @param amount increment amount (default 1.0)
+     * @param amount non-negative increment; 1.0 counts one occurrence
      */
     fun increment(amount: Double = 1.0)
 }
 
+/**
+ * Timer handle for recording operation latency for a specific series.
+ *
+ * Use cases: HTTP handler latency, database queries, RPC calls.
+ * Thread-safe; reuse handles.
+ */
 interface TimerHandle {
     /**
-     * Records a duration.
+     * Records a measured duration.
      *
      * @param durationMillis duration in milliseconds
      */
     fun record(durationMillis: Long)
 
     /**
-     * Measures the time to execute [block] and records it.
+     * Times [block], records the duration, and returns its result.
      *
+     * Exceptions are recorded and rethrown.
      * @param block suspending work to time
-     * @return the result of [block]
+     * @return result of [block]
      */
     suspend fun <T> recordSuspend(block: suspend () -> T): T
 }
 
+/**
+ * Gauge handle to set the current value of a series (last-set-wins).
+ *
+ * Use cases: queue depth, pool utilization/size, cache entries.
+ * Thread-safe; reuse handles.
+ */
 interface GaugeHandle {
     /**
      * Sets the current gauge value.
@@ -125,7 +167,12 @@ interface GaugeHandle {
     fun set(value: Double)
 }
 
-/** Holds an active span bound to the current context. */
+/**
+ * Holds an active span bound to the current context.
+ *
+ * Purpose: represent the lifetime of the current span. Always close the scope to end the span and
+ * restore the previous context. Prefer using Kotlin's `use` or `try/finally` to ensure cleanup.
+ */
 interface SpanScope : AutoCloseable {
     /** The active span. */
     val span: TelemetrySpan
@@ -136,6 +183,8 @@ interface SpanScope : AutoCloseable {
 
 /**
  * Minimal span abstraction to avoid leaking vendor types.
+ *
+ * The identifiers can be used for cross-system correlation (e.g., in logs or headers).
  */
 interface TelemetrySpan {
     /**

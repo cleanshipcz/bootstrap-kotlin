@@ -1,14 +1,12 @@
 # Telemetry Module
 
-A framework-agnostic telemetry facade for Kotlin apps. It hides vendor SDKs (OpenTelemetry, Micrometer)
-behind a simple API and supports configuration-driven exporters for Prometheus (metrics) and OTLP (Tempo traces, OTEL
-metrics). For logging, use standard SLF4J 2.x with Logback and the provided `TraceJsonProvider` to correlate logs with traces.
+A framework-agnostic telemetry facade for Kotlin apps. It hides vendor SDKs (OpenTelemetry, Micrometer) behind a simple API and supports configuration-driven exporters for Prometheus (metrics) and OTLP (Tempo traces, OTEL metrics). For logging, use standard SLF4J 2.x with Logback and the provided `TraceJsonProvider` to correlate logs with traces.
 
 ## Features
 
 - Tracing via OpenTelemetry with W3C Trace Context propagation.
 - Metrics via Micrometer: counters, timers, gauges. Prometheus-compatible naming/labels.
-- Log correlation via SLF4J/Logback JSON with automatic `trace_id` and `span_id` via `TraceJsonProvider` (no MDC). See [Structured JSON logging (Logback)](#structured-json-logging-logback).
+- Log correlation via SLF4J/Logback JSON with automatic `trace_id` and `span_id` via `TraceJsonProvider`. See [Structured JSON logging (Logback)](#structured-json-logging-logback).
 - Configurable exporters via env vars / system properties.
 
 ## Table of contents
@@ -16,6 +14,7 @@ metrics). For logging, use standard SLF4J 2.x with Logback and the provided `Tra
 - [Gradle](#gradle)
 - [Quick start](#quick-start)
 - [Usage patterns and examples](#usage-patterns-and-examples)
+- [Trace context: trace_id vs span_id and propagation](#trace-context-trace_id-vs-span_id-and-propagation)
 - [Configuration](#configuration-env-or--d-system-properties)
 - [Exporter selection and typical setups](#exporter-selection-and-typical-setups)
 - [What prints to STDOUT vs what is sent](#what-prints-to-stdout-vs-what-is-sent)
@@ -42,17 +41,26 @@ import cz.cleanship.telemetry.*
 import org.slf4j.LoggerFactory
 
 fun main() {
+    // create a telemetry instance with a default configuration
     val telemetry = Telemetry.create(TelemetryConfig.fromEnvironment())
+    // create a logger
     val log = LoggerFactory.getLogger("example.app")
 
+    // create and register counter metric (registered under a combination of name and tags - see docs)
     val requests = telemetry.counter("http_requests_total", mapOf("method" to "GET"))
 
+    // wrap the next execution in a span (everything within that execution is part of the span (even nested spans)) and logged as such -> good for tracing e.g. unique incoming request processing
+    // - span_id and trace_id are then automatically added to any logs within this span
     telemetry.inSpan("handle-request", SpanKind.SERVER, mapOf("route" to "/hello")) { span ->
+        // increment counter -> counts incoming requests
         requests.increment()
+        // create and register a timer metric (registered under a combination of name and tags - see docs)
         val timer = telemetry.timer("work_duration_ms")
+        // record a time interval -> counts work duration
         timer.recordSuspend {
             // do work
         }
+        // create and register a gauge metric (registered under a combination of name and tags - see docs) and set the value (e.g. queue depth)
         telemetry.gauge("queue_depth").set(3.0)
         // SLF4J 2.x event API for structured logging
         log.atInfo().addKeyValue("user", 42).log("Handled request")
@@ -74,10 +82,12 @@ val httpRequests = telemetry.counter("http_requests_total")
 val requestLatency = telemetry.timer("http_request_duration_ms")
 
 suspend fun handleRequest(method: String, route: String) {
-    telemetry.inSpan("http.server.request", SpanKind.SERVER, mapOf(
-        "http.method" to method,
-        "http.route" to route,
-    )) {
+    telemetry.inSpan(
+        "http.server.request", SpanKind.SERVER, mapOf(
+            "http.method" to method,
+            "http.route" to route,
+        )
+    ) {
         httpRequests.increment()
         requestLatency.recordSuspend {
             // your business logic here
@@ -88,6 +98,7 @@ suspend fun handleRequest(method: String, route: String) {
 ```
 
 Why this pattern:
+
 - Tracing gives per-request diagnostics and causality.
 - The counter and timer provide aggregate visibility for dashboards and alerts.
 - Structured logs add searchable fields without high-cardinality metric labels.
@@ -109,6 +120,7 @@ suspend fun charge(amount: Long) = telemetry.inSpan(
 ```
 
 Why this pattern:
+
 - A CLIENT span clearly marks the outbound dependency in traces.
 - The timer captures latency distribution over time for SLOs and alerting.
 
@@ -129,6 +141,7 @@ suspend fun doWork() = telemetry.inSpan("work") {
 ```
 
 Why this pattern:
+
 - The span captures the exception (stack trace, status) for traces.
 - The log provides an immediate alerting/signal channel and searchable context.
 
@@ -160,6 +173,7 @@ log.error("Failed", fields = mapOf("orderId" to 123), t = RuntimeException("boom
 ```
 
 Reasoning:
+
 - They delegate to `logger.atXxx().addKeyValue(...)` under the hood; use them if you like map ergonomics.
 - Otherwise, prefer the standard event API directly.
 
@@ -192,6 +206,60 @@ class MetricsController(private val telemetry: TelemetryFacade = Telemetry.creat
 - Prefer low-cardinality labels: `http.method`, `http.route` (templated), `status_class`.
 - Avoid labels like user ID, raw URL, request ID (these belong in spans/logs).
 - Use spans for high-cardinality, per-request context; metrics for aggregation and alerting.
+
+## Trace context: trace_id vs span_id and propagation
+
+Short version
+
+- trace_id: Identifies the entire request/transaction across services. All spans for the same operation share it.
+- span_id: Identifies one span (unit of work) within that trace. Child spans point to their parent via parentSpanId.
+
+How to use it across services
+
+1) Get the IDs in service A
+
+- Inside `TelemetryFacade.inSpan { }`, you receive `TelemetrySpan` with `traceId` and `spanId`.
+- If you log within a span, the JSON provider (or our logger helpers) adds `trace_id` and `span_id` automatically.
+
+2) Inject trace context into outgoing HTTP headers (service A)
+
+```kotlin
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
+import io.opentelemetry.context.Context
+
+suspend fun callDownstream() = telemetry.inSpan("payments.charge", SpanKind.CLIENT) {
+    val headers = mutableMapOf<String, String>()
+    val propagator = W3CTraceContextPropagator.getInstance()
+    // Inject the CURRENT context (must be inside an active span)
+    propagator.inject(Context.current(), headers) { carrier, key, value -> carrier[key] = value }
+    // Use 'headers' for your HTTP client request
+}
+```
+
+3) Extract context on the receiving side (service B) and create a child span
+
+```kotlin
+import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
+import io.opentelemetry.context.Context
+
+fun handleIncoming(headers: Map<String, String>, telemetry: TelemetryFacade) {
+    val propagator = W3CTraceContextPropagator.getInstance()
+    val parentCtx = propagator.extract(Context.current(), headers) { carrier, key -> carrier[key] }
+    val scope = parentCtx.makeCurrent()
+    try {
+        telemetry.inSpan("handle-request", SpanKind.SERVER) { span ->
+            // This span shares the same trace_id, has a new span_id, and links to the parent
+        }
+    } finally {
+        scope.close()
+    }
+}
+```
+
+Notes
+
+- You do not set `trace_id` manually. You propagate context (headers) between services; the new span inherits the `trace_id`.
+- Many frameworks/instrumentations can auto-inject/extract W3C headers. The examples above show the minimal manual approach when using this facade directly.
 
 ## Configuration (env or -D system properties)
 
@@ -229,18 +297,18 @@ Notes
 Typical configs
 
 - Local dev (console only):
-  - `TELEMETRY_EXPORTER_TRACES=logging`
-  - `TELEMETRY_EXPORTER_METRICS=logging`
+    - `TELEMETRY_EXPORTER_TRACES=logging`
+    - `TELEMETRY_EXPORTER_METRICS=logging`
 - Prod (pull metrics, send traces):
-  - `TELEMETRY_EXPORTER_TRACES=otlp`
-  - `TELEMETRY_EXPORTER_METRICS=prometheus`
-  - `TELEMETRY_OTLP_ENDPOINT=http://collector:4318`
+    - `TELEMETRY_EXPORTER_TRACES=otlp`
+    - `TELEMETRY_EXPORTER_METRICS=prometheus`
+    - `TELEMETRY_OTLP_ENDPOINT=http://collector:4318`
 - Combined (send and see locally):
-  - `TELEMETRY_EXPORTER_TRACES=logging,otlp`
-  - `TELEMETRY_EXPORTER_METRICS=prometheus,otlp,logging`
+    - `TELEMETRY_EXPORTER_TRACES=logging,otlp`
+    - `TELEMETRY_EXPORTER_METRICS=prometheus,otlp,logging`
 - Tests:
-  - `TELEMETRY_EXPORTER_TRACES=inmemory`
-  - `TELEMETRY_EXPORTER_METRICS=none`
+    - `TELEMETRY_EXPORTER_TRACES=inmemory`
+    - `TELEMETRY_EXPORTER_METRICS=none`
 
 ## What prints to STDOUT vs what is sent
 
@@ -362,6 +430,7 @@ fun handleRequest(reqId: String) {
 ```
 
 Notes:
+
 - MDC is thread‑local; in coroutines, execution may hop threads. If you need MDC across coroutines, consider `kotlinx-coroutines-slf4j` and wrap blocks with `MDCContext(MDC.getCopyOfContextMap())`.
 - Keep MDC keys low‑cardinality and non‑sensitive; they are printed on every log when `<mdc/>` is enabled.
 
@@ -409,6 +478,7 @@ class EnvJsonProvider : AbstractJsonProvider<ILoggingEvent>() {
 Register it in Logback alongside `TraceJsonProvider`:
 
 ```xml
+
 <providers>
     <timestamp/>
     <loggerName/>
@@ -418,10 +488,11 @@ Register it in Logback alongside `TraceJsonProvider`:
     <provider class="cz.cleanship.telemetry.logging.TraceJsonProvider"/>
     <provider class="com.example.logging.EnvJsonProvider"/>
     <!-- or <mdc/> if you rely on MDC -->
- </providers>
+</providers>
 ```
 
 When to use what:
+
 - Use `TraceJsonProvider` for `trace_id`/`span_id` (no MDC needed).
 - Use SLF4J 2.x event API for per‑log structured fields (`addKeyValue`).
 - Use MDC for ambient fields you want on every log in a scope, including third‑party logs.
@@ -429,20 +500,20 @@ When to use what:
 ## Gotchas
 
 - Log correlation requires the provider
-  - Add `cz.cleanship.telemetry.logging.TraceJsonProvider` to your Logback JSON encoder providers. Without it (or MDC), `trace_id`/`span_id` will not be written.
-  - The provider works with JSON encoders (e.g., logstash-logback-encoder). It does not affect plain pattern layouts.
+    - Add `cz.cleanship.telemetry.logging.TraceJsonProvider` to your Logback JSON encoder providers. Without it (or MDC), `trace_id`/`span_id` will not be written.
+    - The provider works with JSON encoders (e.g., logstash-logback-encoder). It does not affect plain pattern layouts.
 - Context propagation
-  - Inside `telemetry.inSpan { ... }` the span is set as current and is propagated across coroutines via `Context.asContextElement()`.
-  - If you spawn threads or leave the `inSpan` scope, propagate OTel Context manually if you still need correlation.
+    - Inside `telemetry.inSpan { ... }` the span is set as current and is propagated across coroutines via `Context.asContextElement()`.
+    - If you spawn threads or leave the `inSpan` scope, propagate OTel Context manually if you still need correlation.
 - SLF4J API level
-  - Examples use SLF4J 2.x event API (`logger.atInfo().addKeyValue(...)`). With Logback 1.5.x this is available by default.
-  - If stuck on older SLF4J, consider `StructuredArguments` from logstash-logback-encoder as an alternative for structured fields.
+    - Examples use SLF4J 2.x event API (`logger.atInfo().addKeyValue(...)`). With Logback 1.5.x this is available by default.
+    - If stuck on older SLF4J, consider `StructuredArguments` from logstash-logback-encoder as an alternative for structured fields.
 - MDC is optional
-  - The provider reads the current OTel context directly; you do not need MDC for trace/span correlation.
-  - If you choose to rely on MDC for other reasons, include `<mdc/>` in providers and manage MDC entries carefully.
+    - The provider reads the current OTel context directly; you do not need MDC for trace/span correlation.
+    - If you choose to rely on MDC for other reasons, include `<mdc/>` in providers and manage MDC entries carefully.
 - Metric label cardinality
-  - Keep metric labels low-cardinality (e.g., `http.method`, `http.route`, `status_class`). Avoid user IDs, raw URLs, etc.
-  - Use spans for high-cardinality diagnostic data; use metrics for aggregation and alerting.
+    - Keep metric labels low-cardinality (e.g., `http.method`, `http.route`, `status_class`). Avoid user IDs, raw URLs, etc.
+    - Use spans for high-cardinality diagnostic data; use metrics for aggregation and alerting.
 
 ## Testing
 

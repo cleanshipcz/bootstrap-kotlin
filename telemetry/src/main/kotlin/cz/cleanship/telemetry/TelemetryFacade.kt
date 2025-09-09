@@ -11,11 +11,13 @@ interface TelemetryFacade {
      *
      * @param name stable metric name identifying the time series. Choose a descriptive, low-cardinality
      * name (e.g., "http_server_requests_total"). The name is combined with [tags] to form distinct
-     * time series in backends.
+     * time series in backends. Must match the regex `[A-Za-z0-9_:]+`.
      * @param tags dimensional labels for the series (e.g., method=GET, status=200). Using the same
      * [name] with different tag sets creates separate series; using the same [name] and identical
-     * tag set contributes to the same series. Be cautious with tag cardinality.
+     * tag set contributes to the same series. Tag keys must match `[A-Za-z0-9_:]+`; tag values must not
+     * contain spaces or double quotes. Be cautious with tag cardinality.
      * @return a handle to increment the counter; call [CounterHandle.increment] when the event occurs.
+     * @throws IllegalArgumentException if [name] or any tag key/value violates the format constraints.
      * @see timer
      * @see gauge
      */
@@ -28,12 +30,14 @@ interface TelemetryFacade {
      * Returns a timer handle used to record durations/latency of operations.
      *
      * @param name stable metric name for latency measurement (e.g., "db_query_latency"). The name is
-     * combined with [tags] to identify the series.
+     * combined with [tags] to identify the series. Must match the regex `[A-Za-z0-9_:]+`.
      * @param tags dimensional labels for breaking down latency (e.g., query=select_user). As with
      * counters, same [name] + equal [tags] aggregate together; different tags produce separate series.
+     * Tag keys must match `[A-Za-z0-9_:]+`; tag values must not contain spaces or double quotes.
      * @return a handle to record durations via [TimerHandle.record] or to time suspending work via
      * [TimerHandle.recordSuspend]. Common use cases include measuring HTTP handler latency, DB calls,
      * or RPC round-trips.
+     * @throws IllegalArgumentException if [name] or any tag key/value violates the format constraints.
      * @see counter
      * @see gauge
      */
@@ -46,11 +50,13 @@ interface TelemetryFacade {
      * Returns a gauge handle representing a value at a point in time (last-set-wins).
      *
      * @param name stable metric name for the gauge (e.g., "queue_depth", "cache_size"). The name is
-     * combined with [tags] to identify the series.
+     * combined with [tags] to identify the series. Must match the regex `[A-Za-z0-9_:]+`.
      * @param tags dimensional labels for the gauge series (e.g., queue=payments). Same rules as above
      * apply: same [name] + equal [tags] update the same series.
+     * Tag keys must match `[A-Za-z0-9_:]+`; tag values must not contain spaces or double quotes.
      * @return a handle to set gauge values via [GaugeHandle.set]. Typical use cases include queue sizes,
      * pool utilization, and cache metrics.
+     * @throws IllegalArgumentException if [name] or any tag key/value violates the format constraints.
      * @see counter
      * @see timer
      */

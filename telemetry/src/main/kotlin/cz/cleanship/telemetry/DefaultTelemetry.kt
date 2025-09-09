@@ -153,9 +153,9 @@ class DefaultTelemetry(
     }
 
     override fun counter(name: String, tags: Map<String, String>): CounterHandle {
-        val metricName = sanitizeMetricName(name)
+        validateMetricName(name)
         val micrometerTags = tagsToMicrometer(tags)
-        val counter = meterRegistry.counter(metricName, micrometerTags)
+        val counter = meterRegistry.counter(name, micrometerTags)
         return object : CounterHandle {
             override fun increment(amount: Double) {
                 counter.increment(amount)
@@ -164,9 +164,9 @@ class DefaultTelemetry(
     }
 
     override fun timer(name: String, tags: Map<String, String>): TimerHandle {
-        val metricName = sanitizeMetricName(name)
+        validateMetricName(name)
         val micrometerTags = tagsToMicrometer(tags)
-        val timer = Timer.builder(metricName).tags(micrometerTags).register(meterRegistry)
+        val timer = Timer.builder(name).tags(micrometerTags).register(meterRegistry)
         return object : TimerHandle {
             override fun record(durationMillis: Long) {
                 timer.record(durationMillis, TimeUnit.MILLISECONDS)
@@ -186,10 +186,10 @@ class DefaultTelemetry(
     }
 
     override fun gauge(name: String, tags: Map<String, String>): GaugeHandle {
-        val metricName = sanitizeMetricName(name)
+        validateMetricName(name)
         val micrometerTags = tagsToMicrometer(tags)
         val ref = AtomicReference(0.0)
-        Gauge.builder(metricName, ref) { r -> r.get() }.tags(micrometerTags).register(meterRegistry)
+        Gauge.builder(name, ref) { r -> r.get() }.tags(micrometerTags).register(meterRegistry)
         return object : GaugeHandle {
             override fun set(value: Double) {
                 ref.set(value)
@@ -257,19 +257,30 @@ class DefaultTelemetry(
 
     // ---------- Helpers ----------
 
-    private fun sanitizeMetricName(raw: String): String = raw
-        .replace('-', '_')
-        .replace('.', '_')
-        .replace(Regex("[^a-zA-Z0-9_:]"), "_")
+    private fun validateMetricName(name: String) {
+        require(name.matches(Regex("^[A-Za-z0-9_:]+$"))) {
+            "Invalid metric name '$name': must match [A-Za-z0-9_:]+"
+        }
+    }
 
-    private fun sanitizeLabelName(raw: String): String = sanitizeMetricName(raw)
+    private fun validateLabelName(name: String) {
+        require(name.matches(Regex("^[A-Za-z0-9_:]+$"))) {
+            "Invalid label name '$name': must match [A-Za-z0-9_:]+"
+        }
+    }
 
-    private fun sanitizeLabelValue(raw: String): String = raw
-        .replace('"', '_')
-        .replace(' ', '_')
+    private fun validateLabelValue(value: String) {
+        require('"' !in value && !value.any { it.isWhitespace() }) {
+            "Invalid label value '$value': must not contain spaces or double quotes (\")"
+        }
+    }
 
     private fun tagsToMicrometer(tags: Map<String, String>): Iterable<Tag> =
-        tags.map { Tag.of(sanitizeLabelName(it.key), sanitizeLabelValue(it.value)) }
+        tags.map { (k, v) ->
+            validateLabelName(k)
+            validateLabelValue(v)
+            Tag.of(k, v)
+        }
 
     private fun setSpanAttributes(builder: io.opentelemetry.api.trace.SpanBuilder, attributes: Map<String, Any?>) {
         for ((k, v) in attributes) {

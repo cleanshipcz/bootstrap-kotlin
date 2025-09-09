@@ -207,6 +207,31 @@ class MetricsController(private val telemetry: TelemetryFacade = Telemetry.creat
 - Avoid labels like user ID, raw URL, request ID (these belong in spans/logs).
 - Use spans for high-cardinality, per-request context; metrics for aggregation and alerting.
 
+### Metric naming and label requirements (strict)
+
+Metric names and labels must follow these rules to ensure compatibility with common monitoring backends and predictable dashboards/queries.
+
+- Metric name format: must match `[A-Za-z0-9_:]+`
+  - Examples: `http_requests_total`, `db_query_latency`, `my:custom:metric`
+  - Not allowed: `http-requests` (dash), `db.query.latency` (dot), `user id` (space)
+
+- Label key format: must match `[A-Za-z0-9_:]+`
+  - Examples: `method`, `status_code`, `service:role`
+  - Not allowed: `status-code` (dash), `http.route` (dot), `user id` (space)
+
+- Label value format: must not contain spaces or the double-quote character (`"`)
+  - Examples: `GET`, `payments`, `/hello`
+  - Not allowed: `bad value` (space), `a"b` (double quote)
+
+Behavior on invalid inputs
+
+- `TelemetryFacade.counter(...)`, `timer(...)`, and `gauge(...)` throw `IllegalArgumentException` if the name or any tag key/value violates these rules. See method KDoc for details.
+
+Rationale
+
+- Ensures consistent, portable naming across tools (Prometheus/OTLP).
+- Prevents accidental high-cardinality or ambiguous series due to ad-hoc characters.
+
 ## Trace context: trace_id vs span_id and propagation
 
 Short version

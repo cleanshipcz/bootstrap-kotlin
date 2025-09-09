@@ -18,10 +18,18 @@ class TelemetryPrometheusTest {
 
     @Test
     fun `prometheus scrape includes metrics`() {
+        // given
+        // - prometheus registry enabled
         val telemetry = createTelemetry()
+        // - and a counter with method/status labels
         val counter = telemetry.counter("http_server_requests_total", mapOf("method" to "GET", "status" to "200"))
+
+        // when
+        // - increment once so metric appears in scrape
         counter.increment()
 
+        // then
+        // - scrape contains metric name and labels
         val scrape = telemetry.prometheusScrape()
         assertNotNull(scrape)
         val text = scrape!!

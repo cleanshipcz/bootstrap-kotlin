@@ -26,6 +26,8 @@ class TelemetryLoggingTest {
 
     @Test
     fun `logs inside spans include trace and span ids via TraceJsonProvider`() = runTest {
+        // given
+        // - configure Logback JSON with TraceJsonProvider and capture output
         val telemetry = createTelemetry()
         val loggerName = "telemetry.test"
 
@@ -49,10 +51,14 @@ class TelemetryLoggingTest {
         appender.start()
         slf4jLogger.addAppender(appender)
 
+        // when
+        // - log inside an active span
         telemetry.inSpan("logging-span") { _ ->
             slf4jLogger.atInfo().addKeyValue("foo", "bar").log("hello")
         }
 
+        // then
+        // - JSON contains trace/span identifiers
         val json = baos.toString("UTF-8")
         assertTrue(json.contains("trace_id"), "JSON should contain trace_id")
         assertTrue(json.contains("span_id"), "JSON should contain span_id")

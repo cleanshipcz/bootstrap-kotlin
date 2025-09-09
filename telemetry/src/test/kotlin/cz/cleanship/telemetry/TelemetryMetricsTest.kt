@@ -20,11 +20,17 @@ class TelemetryMetricsTest {
 
     @Test
     fun `counter increments with tags`() {
+        // given
+        // - counter with a static label
         val telemetry = createTelemetry()
         val counter = telemetry.counter("test_counter", mapOf("label" to "value"))
+
+        // when
         counter.increment(2.0)
         counter.increment(3.0)
 
+        // then
+        // - micrometer registry observes the expected total
         val found = Search
             .`in`(telemetry.registry())
             .name("test_counter")
@@ -36,11 +42,17 @@ class TelemetryMetricsTest {
 
     @Test
     fun `timer records durations`() = runTest {
+        // given
+        // - a timer with a label for filtering
         val telemetry = createTelemetry()
         val timer = telemetry.timer("test_timer", mapOf("status" to "ok"))
-        timer.record(25)
-        timer.recordSuspend { /* work */ }
 
+        // when
+        timer.record(25)
+        timer.recordSuspend { /* simulate work */ }
+
+        // then
+        // - count >= 2 and total time is positive
         val found = Search
             .`in`(telemetry.registry())
             .name("test_timer")
@@ -53,9 +65,16 @@ class TelemetryMetricsTest {
 
     @Test
     fun `gauge reflects last value`() {
+        // given
+        // - gauge updated over time
         val telemetry = createTelemetry()
         val gauge = telemetry.gauge("test_gauge", mapOf("phase" to "alpha"))
+
+        // when
         gauge.set(7.0)
+
+        // then
+        // - registry shows the latest value
         val found = Search
             .`in`(telemetry.registry())
             .name("test_gauge")
@@ -63,7 +82,13 @@ class TelemetryMetricsTest {
             .gauge()
         assertNotNull(found)
         assertEquals(7.0, found!!.value(), 1e-6)
+
+        // when
+        // - update to a new value
         gauge.set(2.5)
+
+        // then
+        // - registry reflects the last set value
         assertEquals(2.5, found.value(), 1e-6)
     }
 }

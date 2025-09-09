@@ -1,3 +1,5 @@
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=cleanshipcz_bootstrap-kotlin)
+
 # Bootstrap Kotlin Application
 
 ## Build and Run

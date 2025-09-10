@@ -188,23 +188,71 @@ interface SpanScope : AutoCloseable {
 }
 
 /**
- * Minimal span abstraction to avoid leaking vendor types.
+ * Minimal, vendor-agnostic view of the current span.
  *
- * The identifiers can be used for cross-system correlation (e.g., in logs or headers).
+ * Use cases:
+ * - Read stable identifiers for correlation (e.g., add to logs or HTTP responses).
+ * - Assert parent/child relationships in tests.
+ *
+ * Notes:
+ * - Valid only while the span scope is active; do not retain beyond the scope.
+ * - Control span lifetime and attributes via [TelemetryFacade.inSpan] or [TelemetryFacade.startSpan].
+ *
+ * @property traceId W3C Trace Context trace-id (32 lowercase hex). Stable across all spans in the same trace; use for log/HTTP correlation.
+ * @property spanId W3C Trace Context span-id (16 lowercase hex) identifying this span; use to link parent/child spans.
+ * @see SpanKind
+ * @see TelemetryFacade.inSpan
  */
 interface TelemetrySpan {
-    /**
-     * The trace ID.
-     */
     val traceId: String
-
-    /**
-     * The span ID.
-     */
     val spanId: String
 }
 
 /**
- * Span kind for new spans.
+ * Classifies the role of a span in a trace. Choose a kind to indicate whether the work is purely
+ * in-process or crosses RPC/HTTP or messaging boundaries. Backends use this to group, visualize,
+ * and derive semantics (e.g., request/response timing, dependency graphs).
+ *
+ * Usage guidelines:
+ * - Use [INTERNAL] for in-process work (business logic, CPU-bound operations).
+ * - Use [SERVER] and [CLIENT] for request/response over RPC/HTTP and similar protocols.
+ * - Use [PRODUCER] and [CONSUMER] for asynchronous messaging (queues, streams, pub/sub).
  */
-enum class SpanKind { INTERNAL, SERVER, CLIENT, PRODUCER, CONSUMER }
+enum class SpanKind {
+    /**
+     * Internal application work that does not cross a process, network, or messaging boundary.
+     *
+     * Typical uses: business logic, in-memory computations, cache lookups, parsing/serialization
+     * performed entirely within the current process.
+     */
+    INTERNAL,
+
+    /**
+     * The current code is receiving a request from a remote peer and acts as the server.
+     *
+     * Typical uses: HTTP request handlers, RPC servers, inbound gRPC endpoints, message
+     * processing frameworks that model inbound handling as server-side work.
+     */
+    SERVER,
+
+    /**
+     * The current code is initiating an outbound request to a remote peer and acts as the client.
+     *
+     * Typical uses: HTTP clients, database drivers, RPC/gRPC clients, calls to external services.
+     */
+    CLIENT,
+
+    /**
+     * The current code publishes a message to a transport or broker without waiting for processing.
+     *
+     * Typical uses: enqueue/send to Kafka/RabbitMQ/PubSub, placing an event/command onto a topic.
+     */
+    PRODUCER,
+
+    /**
+     * The current code consumes a message that was previously produced and delivered by a broker.
+     *
+     * Typical uses: Kafka/RabbitMQ/PubSub consumer handlers, background workers processing queue items.
+     */
+    CONSUMER,
+}

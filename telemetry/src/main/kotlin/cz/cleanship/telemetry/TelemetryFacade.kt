@@ -1,5 +1,7 @@
 package cz.cleanship.telemetry
 
+import cz.cleanship.telemetry.SpanKind.*
+
 /**
  * Framework-agnostic facade over tracing and metrics.
  * Application code should depend only on this interface, not on vendor SDKs.
@@ -7,7 +9,7 @@ package cz.cleanship.telemetry
 interface TelemetryFacade {
     // ---- Metrics ----
     /**
-     * Returns a counter handle used to count occurrences of discrete events (monotonically increasing).
+     * Returns a counter-handle used to count occurrences of discrete events (monotonically increasing).
      *
      * @param name stable metric name identifying the time series. Choose a descriptive, low-cardinality
      * name (e.g., "http_server_requests_total"). The name is combined with [tags] to form distinct
@@ -80,7 +82,7 @@ interface TelemetryFacade {
      */
     fun startSpan(
         name: String,
-        kind: SpanKind = SpanKind.INTERNAL,
+        kind: SpanKind = INTERNAL,
         attributes: Map<String, Any?> = emptyMap(),
     ): SpanScope
 
@@ -99,7 +101,7 @@ interface TelemetryFacade {
      */
     suspend fun <T> inSpan(
         name: String,
-        kind: SpanKind = SpanKind.INTERNAL,
+        kind: SpanKind = INTERNAL,
         attributes: Map<String, Any?> = emptyMap(),
         block: suspend (TelemetrySpan) -> T,
     ): T
@@ -120,7 +122,7 @@ interface TelemetryFacade {
 // ------------ Handles ------------
 
 /**
- * Monotonically increasing counter handle bound to a specific metric series.
+ * Monotonically increasing counter-handle bound to a specific metric series.
  *
  * Use cases: requests, retries, errors, cache hits/misses, processed items.
  * Thread-safe; reuse on hot paths.
@@ -198,7 +200,7 @@ interface SpanScope : AutoCloseable {
  * - Valid only while the span scope is active; do not retain beyond the scope.
  * - Control span lifetime and attributes via [TelemetryFacade.inSpan] or [TelemetryFacade.startSpan].
  *
- * @property traceId W3C Trace Context trace-id (32 lowercase hex). Stable across all spans in the same trace; use for log/HTTP correlation.
+ * @property traceId W3C Trace Context trace-id (32 lowercase hex). Stable across all spans in the same trace; use this for log/HTTP correlation.
  * @property spanId W3C Trace Context span-id (16 lowercase hex) identifying this span; use to link parent/child spans.
  * @see SpanKind
  * @see TelemetryFacade.inSpan

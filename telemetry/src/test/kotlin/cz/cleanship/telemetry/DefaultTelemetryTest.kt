@@ -4,7 +4,11 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.OutputStreamAppender
 import cz.cleanship.telemetry.logging.TraceJsonProvider
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.composite.CompositeMeterRegistry
+import io.micrometer.core.instrument.logging.LoggingMeterRegistry
 import io.micrometer.core.instrument.search.Search
+import io.micrometer.registry.otlp.OtlpMeterRegistry
 import io.opentelemetry.api.common.AttributeKey
 import io.opentelemetry.api.trace.StatusCode
 import kotlinx.coroutines.Dispatchers
@@ -380,5 +384,53 @@ class DefaultTelemetryTest {
         val span = telemetry.inMemorySpans().find { it.name == "operation" }!!
         assertEquals(123L, span.attributes.get(AttributeKey.longKey("user.id")))
         assertEquals(true, span.attributes.get(AttributeKey.booleanKey("success")))
+    }
+
+    @Test
+    fun `logging exporter adds LoggingMeterRegistry`() {
+        // given
+        val t = telemetry(metricsExporters = setOf(MetricsExporter.LOGGING))
+        val composite = t.registry() as CompositeMeterRegistry
+        // Register counter explicitly so it propagates to all child registries
+        val counter = Counter.builder("logging_counter").tags("sink", "logging").register(composite)
+
+        // when
+        counter.increment(4.0)
+
+        // then
+        // - the LoggingMeterRegistry has the same counter with expected tags
+        val logReg = composite.registries.first { it is LoggingMeterRegistry }
+        val logged = Search
+            .`in`(logReg)
+            .name("logging_counter")
+            .tag("sink", "logging")
+            .counter()
+        assertNotNull(logged)
+        assertEquals("logging_counter", logged!!.id.name)
+        assertTrue(logged.id.tags.any { it.key == "sink" && it.value == "logging" })
+    }
+
+    @Test
+    fun `otlp exporter adds OtlpMeterRegistry`() {
+        // given
+        val t = telemetry(metricsExporters = setOf(MetricsExporter.OTLP))
+        val composite = t.registry() as CompositeMeterRegistry
+        // Register counter explicitly so it propagates to all child registries
+        val counter = Counter.builder("otlp_counter").tags("sink", "otlp").register(composite)
+
+        // when
+        counter.increment(3.0)
+
+        // then
+        // - the OtlpMeterRegistry contains the same counter with expected tags
+        val otlpReg = composite.registries.first { it is OtlpMeterRegistry }
+        val otlp = Search
+            .`in`(otlpReg)
+            .name("otlp_counter")
+            .tag("sink", "otlp")
+            .counter()
+        assertNotNull(otlp)
+        assertEquals("otlp_counter", otlp!!.id.name)
+        assertTrue(otlp.id.tags.any { it.key == "sink" && it.value == "otlp" })
     }
 }

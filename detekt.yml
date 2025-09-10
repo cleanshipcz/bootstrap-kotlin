@@ -30,3 +30,5 @@ formatting:
     active: false
   NoWildcardImports:
     active: false
+  ArgumentListWrapping:
+    active: false

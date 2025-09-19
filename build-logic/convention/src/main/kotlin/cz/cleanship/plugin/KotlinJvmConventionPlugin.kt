@@ -15,6 +15,7 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
             // access version catalog
 
             apply(plugin = "org.jetbrains.kotlin.jvm")
+            apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
             apply(plugin = "org.jlleitschuh.gradle.ktlint")
             apply(plugin = "io.gitlab.arturbosch.detekt")
             apply(plugin = "jacoco")

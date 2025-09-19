@@ -3,7 +3,7 @@
 # https://docs.gradle.org/current/userguide/platforms.html#sub::toml-dependencies-format
 
 [versions]
-kotlin = "2.2.10"
+kotlin = "2.2.20"
 kotlinxDatetime = "0.7.1-0.6.x-compat"
 kotlinxSerializationJSON = "1.9.0"
 kotlinxCoroutines = "1.10.2"
@@ -22,7 +22,7 @@ kotlinxCoroutines = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", 
 kotlinxEcosystem = ["kotlinxDatetime", "kotlinxSerialization", "kotlinxCoroutines"]
 
 [plugins]
-kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+kotlinPluginSerialization = { id = "org.jetbrains.kotlin.plugin.serialization" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlintGradle" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 

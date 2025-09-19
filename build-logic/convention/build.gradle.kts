@@ -17,6 +17,7 @@ kotlin {
 dependencies {
     // Add a dependency on the Kotlin Gradle plugin, so that convention plugins can apply it.
     implementation(libs.kotlinGradlePlugin)
+    implementation("org.jetbrains.kotlin:kotlin-serialization:${libs.versions.kotlin.get()}")
     implementation("org.jlleitschuh.gradle:ktlint-gradle:${libs.versions.ktlintGradle.get()}")
     implementation("io.gitlab.arturbosch.detekt:detekt-gradle-plugin:${libs.versions.detekt.get()}")
 }
@@ -31,7 +32,9 @@ tasks {
 gradlePlugin {
     plugins {
         register("kotlinJvmLibrary") {
-            id = libs.plugins.cleanship.kotlin.convention.get().pluginId
+            id = libs.plugins.cleanship.kotlin.convention
+                .get()
+                .pluginId
             implementationClass = "cz.cleanship.plugin.KotlinJvmConventionPlugin"
         }
     }

@@ -1,12 +1,12 @@
 package cz.cleanship.plugin
 
+import io.gitlab.arturbosch.detekt.Detekt
+import io.gitlab.arturbosch.detekt.extensions.DetektExtension
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.tasks.testing.logging.TestLogEvent
 import org.gradle.kotlin.dsl.apply
 import org.gradle.kotlin.dsl.withType
-import io.gitlab.arturbosch.detekt.extensions.DetektExtension
-import io.gitlab.arturbosch.detekt.Detekt
 import org.jlleitschuh.gradle.ktlint.reporter.ReporterType
 
 class KotlinJvmConventionPlugin : Plugin<Project> {
@@ -43,7 +43,7 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
             // Enable formatting rules for Detekt
             dependencies.add(
                 "detektPlugins",
-                "io.gitlab.arturbosch.detekt:detekt-formatting:${libs.findVersion("detekt").get()}"
+                "io.gitlab.arturbosch.detekt:detekt-formatting:${libs.findVersion("detekt").get()}",
             )
 
             tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
@@ -75,5 +75,3 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
         }
     }
 }
-
-

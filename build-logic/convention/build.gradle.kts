@@ -32,7 +32,9 @@ tasks {
 gradlePlugin {
     plugins {
         register("kotlinJvmLibrary") {
-            id = libs.plugins.cleanship.kotlin.convention.get().pluginId
+            id = libs.plugins.cleanship.kotlin.convention
+                .get()
+                .pluginId
             implementationClass = "cz.cleanship.plugin.KotlinJvmConventionPlugin"
         }
     }

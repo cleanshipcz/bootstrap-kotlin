@@ -120,10 +120,12 @@ class DefaultTelemetry(
             }
         }
 
-        val resource = Resource.create(
-            io.opentelemetry.api.common.Attributes.of(
-                AttributeKey.stringKey("service.name"),
-                config.serviceName,
+        val resource = Resource.getDefault().merge(
+            Resource.create(
+                io.opentelemetry.api.common.Attributes.of(
+                    AttributeKey.stringKey("service.name"),
+                    config.serviceName,
+                ),
             ),
         )
 

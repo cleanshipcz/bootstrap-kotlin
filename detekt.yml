@@ -15,7 +15,7 @@ style:
   MagicNumber:
     active: false        # allow magic numbers; enable and configure ignoreNumbers if you want stricter checks
   MaxLineLength:
-    active: false        # enforce maximum line length via editor/ktlint instead
+    active: false        # do not enforce maximum line length, it's not the 90's anymore
   WildcardImport:
     active: false
 

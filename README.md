@@ -2,6 +2,15 @@
 
 # Bootstrap Kotlin Application
 
+## Usage
+
+Offers a template for a Kotlin application including features like:
+
+* Gradle convention plugin for dependency management
+* Code style enforcement using ktlint
+* Static analysis using Detekt
+* Telemetry facade (see `telemetry/README.md`)
+
 ## Build and Run
 
 This project uses [Gradle](https://gradle.org/).
@@ -27,7 +36,7 @@ The shared build logic is extracted to a convention plugin located in `build-log
 
 ### Dependency Management
 
-This project uses a version catalog (see `gradle/libs.versions.toml`) to declare and version dependencies and both a build cache and a configuration cache (see `gradle.properties`).
+This project uses a version catalog (see `gradle/libs.versions.toml`) to declare and version dependencies.
 
 ### Code style
 

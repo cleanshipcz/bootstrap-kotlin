@@ -4,24 +4,24 @@ import io.opentelemetry.api.trace.SpanContext
 import io.opentelemetry.api.trace.SpanKind
 import io.opentelemetry.api.trace.TraceFlags
 import io.opentelemetry.api.trace.TraceState
-import io.opentelemetry.sdk.common.CompletableResultCode
 import io.opentelemetry.sdk.testing.trace.TestSpanData
 import io.opentelemetry.sdk.trace.data.SpanData
 import io.opentelemetry.sdk.trace.data.StatusData
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 
 class LocalInMemorySpanExporterTest {
 
     @Test
     fun `export stores spans and reset clears them`() {
+        // given
         val exporter = LocalInMemorySpanExporter()
         val empty: MutableCollection<SpanData> = mutableListOf()
-        assertTrue(exporter.export(empty) == CompletableResultCode.ofSuccess())
-        assertEquals(0, exporter.finishedSpanItems.size)
+        assertThat(exporter.export(empty).isSuccess).isTrue()
+        assertThat(exporter.finishedSpanItems).isEmpty()
 
-        // Build a minimal valid finished span
+        // when
+        // - build a minimal valid finished span
         val span = TestSpanData
             .builder()
             .setName("test")
@@ -40,13 +40,14 @@ class LocalInMemorySpanExporterTest {
             .setHasEnded(true)
             .build()
 
+        // then
         val batch: MutableCollection<SpanData> = mutableListOf(span)
-        assertTrue(exporter.export(batch) == CompletableResultCode.ofSuccess())
-        assertEquals(1, exporter.finishedSpanItems.size)
-        assertEquals("test", exporter.finishedSpanItems.first().name)
+        assertThat(exporter.export(batch).isSuccess).isTrue()
+        assertThat(exporter.finishedSpanItems).hasSize(1)
+        assertThat(exporter.finishedSpanItems.first().name).isEqualTo("test")
 
-        // reset clears storage
+        // - reset clears storage
         exporter.reset()
-        assertEquals(0, exporter.finishedSpanItems.size)
+        assertThat(exporter.finishedSpanItems).isEmpty()
     }
 }

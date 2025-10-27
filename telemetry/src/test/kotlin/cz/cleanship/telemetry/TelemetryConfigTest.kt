@@ -1,8 +1,7 @@
 package cz.cleanship.telemetry
 
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class TelemetryConfigTest {
@@ -39,10 +38,12 @@ class TelemetryConfigTest {
         val cfg = TelemetryConfig.fromEnvironment()
 
         // then
-        assertEquals("svc-A", cfg.serviceName)
-        assertEquals(setOf(TracesExporter.LOGGING, TracesExporter.OTLP, TracesExporter.INMEMORY_FOR_TESTS), cfg.tracesExporters)
-        assertEquals(setOf(MetricsExporter.PROMETHEUS, MetricsExporter.LOGGING), cfg.metricsExporters)
-        assertEquals("http://example:4318", cfg.otlpEndpoint)
+        assertThat(cfg.serviceName).isEqualTo("svc-A")
+        assertThat(cfg.tracesExporters)
+            .containsExactlyInAnyOrder(TracesExporter.LOGGING, TracesExporter.OTLP, TracesExporter.INMEMORY_FOR_TESTS)
+        assertThat(cfg.metricsExporters)
+            .containsExactlyInAnyOrder(MetricsExporter.PROMETHEUS, MetricsExporter.LOGGING)
+        assertThat(cfg.otlpEndpoint).isEqualTo("http://example:4318")
     }
 
     @Test
@@ -55,18 +56,20 @@ class TelemetryConfigTest {
         val cfg = TelemetryConfig.fromEnvironment()
 
         // then
-        assertEquals(setOf(TracesExporter.INMEMORY_FOR_TESTS), cfg.tracesExporters)
-        assertEquals(setOf(MetricsExporter.OTLP), cfg.metricsExporters)
+        assertThat(cfg.tracesExporters)
+            .containsExactly(TracesExporter.INMEMORY_FOR_TESTS)
+        assertThat(cfg.metricsExporters)
+            .containsExactly(MetricsExporter.OTLP)
     }
 
     @Test
     fun `TracesExporter from is case-insensitive and defaults to NONE`() {
         // given/when/then
-        assertEquals(TracesExporter.LOGGING, TracesExporter.from("LoGgInG"))
-        assertEquals(TracesExporter.OTLP, TracesExporter.from("otlp"))
-        assertEquals(TracesExporter.INMEMORY_FOR_TESTS, TracesExporter.from("INMEMORY"))
-        assertEquals(TracesExporter.NONE, TracesExporter.from(null))
-        assertEquals(TracesExporter.NONE, TracesExporter.from("unknown"))
+        assertThat(TracesExporter.from("LoGgInG")).isEqualTo(TracesExporter.LOGGING)
+        assertThat(TracesExporter.from("otlp")).isEqualTo(TracesExporter.OTLP)
+        assertThat(TracesExporter.from("INMEMORY")).isEqualTo(TracesExporter.INMEMORY_FOR_TESTS)
+        assertThat(TracesExporter.from(null)).isEqualTo(TracesExporter.NONE)
+        assertThat(TracesExporter.from("unknown")).isEqualTo(TracesExporter.NONE)
     }
 
     @Test
@@ -78,18 +81,19 @@ class TelemetryConfigTest {
         val result = TracesExporter.fromList(input)
 
         // then
-        assertEquals(setOf(TracesExporter.LOGGING, TracesExporter.OTLP, TracesExporter.INMEMORY_FOR_TESTS), result)
-        assertTrue(TracesExporter.fromList(null).isEmpty())
+        assertThat(result)
+            .containsExactlyInAnyOrder(TracesExporter.LOGGING, TracesExporter.OTLP, TracesExporter.INMEMORY_FOR_TESTS)
+        assertThat(TracesExporter.fromList(null)).isEmpty()
     }
 
     @Test
     fun `MetricsExporter from is case-insensitive and defaults to NONE`() {
         // given/when/then
-        assertEquals(MetricsExporter.PROMETHEUS, MetricsExporter.from("PrOmEtHeUs"))
-        assertEquals(MetricsExporter.OTLP, MetricsExporter.from("otlp"))
-        assertEquals(MetricsExporter.LOGGING, MetricsExporter.from("LOGGING"))
-        assertEquals(MetricsExporter.NONE, MetricsExporter.from(null))
-        assertEquals(MetricsExporter.NONE, MetricsExporter.from("unknown"))
+        assertThat(MetricsExporter.from("PrOmEtHeUs")).isEqualTo(MetricsExporter.PROMETHEUS)
+        assertThat(MetricsExporter.from("otlp")).isEqualTo(MetricsExporter.OTLP)
+        assertThat(MetricsExporter.from("LOGGING")).isEqualTo(MetricsExporter.LOGGING)
+        assertThat(MetricsExporter.from(null)).isEqualTo(MetricsExporter.NONE)
+        assertThat(MetricsExporter.from("unknown")).isEqualTo(MetricsExporter.NONE)
     }
 
     @Test
@@ -101,7 +105,8 @@ class TelemetryConfigTest {
         val result = MetricsExporter.fromList(input)
 
         // then
-        assertEquals(setOf(MetricsExporter.PROMETHEUS, MetricsExporter.LOGGING, MetricsExporter.OTLP), result)
-        assertTrue(MetricsExporter.fromList(null).isEmpty())
+        assertThat(result)
+            .containsExactlyInAnyOrder(MetricsExporter.PROMETHEUS, MetricsExporter.LOGGING, MetricsExporter.OTLP)
+        assertThat(MetricsExporter.fromList(null)).isEmpty()
     }
 }

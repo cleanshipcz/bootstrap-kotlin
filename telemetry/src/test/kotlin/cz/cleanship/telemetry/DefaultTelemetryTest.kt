@@ -16,7 +16,10 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withContext
 import net.logstash.logback.composite.loggingevent.LoggingEventJsonProviders
 import net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder
-import org.junit.jupiter.api.Assertions.*
+import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
+import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.within
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import java.io.ByteArrayOutputStream
@@ -44,9 +47,9 @@ class DefaultTelemetryTest {
         val t = telemetry()
 
         // when/then
-        assertThrows(IllegalArgumentException::class.java) { t.counter("bad-name") }
-        assertThrows(IllegalArgumentException::class.java) { t.timer("db.query.latency") }
-        assertDoesNotThrow { t.counter("good_name:part2") }
+        assertThatThrownBy { t.counter("bad-name") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { t.timer("db.query.latency") }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatCode { t.counter("good_name:part2") }.doesNotThrowAnyException()
     }
 
     @Test
@@ -55,10 +58,10 @@ class DefaultTelemetryTest {
         val t = telemetry()
 
         // when/then
-        assertThrows(IllegalArgumentException::class.java) { t.counter("ok", mapOf("bad key" to "v")) }
-        assertThrows(IllegalArgumentException::class.java) { t.counter("ok", mapOf("key" to "bad value")) }
-        assertThrows(IllegalArgumentException::class.java) { t.gauge("ok", mapOf("http.route" to "/hello")) }
-        assertDoesNotThrow { t.timer("ok", mapOf("status_code" to "200")) }
+        assertThatThrownBy { t.counter("ok", mapOf("bad key" to "v")) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { t.counter("ok", mapOf("key" to "bad value")) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy { t.gauge("ok", mapOf("http.route" to "/hello")) }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatCode { t.timer("ok", mapOf("status_code" to "200")) }.doesNotThrowAnyException()
     }
 
     // ---- Tracing attributes & errors ----
@@ -85,13 +88,13 @@ class DefaultTelemetryTest {
         // then
         val span = t.inMemorySpans().find { it.name == "attr-op" }!!
         val attrs = span.attributes
-        assertEquals("str", attrs.get(AttributeKey.stringKey("s")))
-        assertEquals(true, attrs.get(AttributeKey.booleanKey("b")))
-        assertEquals(7L, attrs.get(AttributeKey.longKey("i")))
-        assertEquals(9L, attrs.get(AttributeKey.longKey("l")))
-        assertEquals(1.5, attrs.get(AttributeKey.doubleKey("d")))
-        assertEquals(2.5, attrs.get(AttributeKey.doubleKey("f")))
-        assertEquals(listOf(1, 2, 3).toString(), attrs.get(AttributeKey.stringKey("x")))
+        assertThat(attrs.get(AttributeKey.stringKey("s"))).isEqualTo("str")
+        assertThat(attrs.get(AttributeKey.booleanKey("b"))).isTrue()
+        assertThat(attrs.get(AttributeKey.longKey("i"))).isEqualTo(7L)
+        assertThat(attrs.get(AttributeKey.longKey("l"))).isEqualTo(9L)
+        assertThat(attrs.get(AttributeKey.doubleKey("d"))).isEqualTo(1.5)
+        assertThat(attrs.get(AttributeKey.doubleKey("f"))).isEqualTo(2.5)
+        assertThat(attrs.get(AttributeKey.stringKey("x"))).isEqualTo(listOf(1, 2, 3).toString())
     }
 
     @Test
@@ -109,10 +112,10 @@ class DefaultTelemetryTest {
         // then
         val spans = t.inMemorySpans()
         val span = spans.find { it.name == "failing-op" }
-        assertNotNull(span)
+        assertThat(span).isNotNull
         span!!
-        assertEquals(StatusCode.ERROR, span.status.statusCode)
-        assertTrue(span.events.any { it.name == "exception" }, "span should contain exception event")
+        assertThat(span.status.statusCode).isEqualTo(StatusCode.ERROR)
+        assertThat(span.events.any { it.name == "exception" }).isTrue()
     }
 
     // ---- Misc ----
@@ -123,7 +126,7 @@ class DefaultTelemetryTest {
         val t = telemetry()
 
         // when/then
-        assertDoesNotThrow { t.shutdown() }
+        assertThatCode { t.shutdown() }.doesNotThrowAnyException()
     }
 
     @Test
@@ -135,7 +138,7 @@ class DefaultTelemetryTest {
         val scrape = t.prometheusScrape()
 
         // then
-        assertNull(scrape)
+        assertThat(scrape).isNull()
     }
 
     @Test
@@ -148,7 +151,7 @@ class DefaultTelemetryTest {
 
         // then
         val span = t.inMemorySpans().first { it.name == "res-op" }
-        assertEquals("my-service", span.resource.getAttribute(AttributeKey.stringKey("service.name")))
+        assertThat(span.resource.getAttribute(AttributeKey.stringKey("service.name"))).isEqualTo("my-service")
     }
 
     @Test
@@ -157,13 +160,13 @@ class DefaultTelemetryTest {
         val t = telemetry()
 
         // when
-        for (k in SpanKind.values()) {
+        for (k in SpanKind.entries) {
             t.inSpan("kind-$k", k) { }
         }
 
         // then
         val names = t.inMemorySpans().map { it.name }.toSet()
-        for (k in SpanKind.values()) {
+        for (k in SpanKind.entries) {
             assert(names.contains("kind-$k")) { "missing span for kind $k" }
         }
     }
@@ -180,7 +183,7 @@ class DefaultTelemetryTest {
         // then
         val spans = t.inMemorySpans()
         val span = spans.find { it.name == "manual-span" }!!
-        assertEquals("manual-span", span.name)
+        assertThat(span.name).isEqualTo("manual-span")
     }
 
     @Test
@@ -193,7 +196,7 @@ class DefaultTelemetryTest {
         val slf4jLogger = LoggerFactory.getLogger(loggerName) as Logger
         val ctx = slf4jLogger.loggerContext
 
-        // Configure JSON encoder with our provider
+        // - configure JSON encoder with our provider
         val encoder = LoggingEventCompositeJsonEncoder()
         encoder.context = ctx
         val providers = LoggingEventJsonProviders()
@@ -201,7 +204,7 @@ class DefaultTelemetryTest {
         encoder.setProviders(providers)
         encoder.start()
 
-        // Capture output into a byte array
+        // - capture output into a byte array
         val baos = ByteArrayOutputStream()
         val appender = object : OutputStreamAppender<ILoggingEvent>() {}
         appender.context = ctx
@@ -219,8 +222,8 @@ class DefaultTelemetryTest {
         // then
         // - JSON contains trace/span identifiers
         val json = baos.toString("UTF-8")
-        assertTrue(json.contains("trace_id"), "JSON should contain trace_id")
-        assertTrue(json.contains("span_id"), "JSON should contain span_id")
+        assertThat(json).contains("trace_id")
+        assertThat(json).contains("span_id")
     }
 
     @Test
@@ -241,8 +244,8 @@ class DefaultTelemetryTest {
             .name("test_counter")
             .tag("label", "value")
             .counter()
-        assertNotNull(found)
-        assertEquals(5.0, found!!.count(), 1e-6)
+        assertThat(found).isNotNull
+        assertThat(found!!.count()).isCloseTo(5.0, within(1e-6))
     }
 
     @Test
@@ -263,9 +266,9 @@ class DefaultTelemetryTest {
             .name("test_timer")
             .tag("status", "ok")
             .timer()
-        assertNotNull(found)
-        assertTrue(found!!.count() >= 2L)
-        assertTrue(found.totalTime(TimeUnit.NANOSECONDS) > 0.0)
+        assertThat(found).isNotNull
+        assertThat(found!!.count()).isGreaterThanOrEqualTo(2L)
+        assertThat(found.totalTime(TimeUnit.NANOSECONDS)).isGreaterThan(0.0)
     }
 
     @Test
@@ -285,8 +288,8 @@ class DefaultTelemetryTest {
             .name("test_gauge")
             .tag("phase", "alpha")
             .gauge()
-        assertNotNull(found)
-        assertEquals(7.0, found!!.value(), 1e-6)
+        assertThat(found).isNotNull
+        assertThat(found!!.value()).isCloseTo(7.0, within(1e-6))
 
         // when
         // - update to a new value
@@ -294,7 +297,7 @@ class DefaultTelemetryTest {
 
         // then
         // - registry reflects the last set value
-        assertEquals(2.5, found.value(), 1e-6)
+        assertThat(found.value()).isCloseTo(2.5, within(1e-6))
     }
 
     @Test
@@ -312,11 +315,11 @@ class DefaultTelemetryTest {
         // then
         // - scrape contains metric name and labels
         val scrape = telemetry.prometheusScrape()
-        assertNotNull(scrape)
+        assertThat(scrape).isNotNull
         val text = scrape!!
-        assertTrue(text.contains("http_server_requests_total"))
-        assertTrue(text.contains("method=\"GET\""))
-        assertTrue(text.contains("status=\"200\""))
+        assertThat(text).contains("http_server_requests_total")
+        assertThat(text).contains("method=\"GET\"")
+        assertThat(text).contains("status=\"200\"")
     }
 
     @Test
@@ -338,8 +341,8 @@ class DefaultTelemetryTest {
         val spans = telemetry.inMemorySpans()
         val parent = spans.find { it.name == "parent" }!!
         val child = spans.find { it.name == "child" }!!
-        assertEquals(parent.traceId, child.traceId)
-        assertEquals(parent.spanId, child.parentSpanId)
+        assertThat(child.traceId).isEqualTo(parent.traceId)
+        assertThat(child.parentSpanId).isEqualTo(parent.spanId)
     }
 
     @Test
@@ -363,8 +366,8 @@ class DefaultTelemetryTest {
         val spans = telemetry.inMemorySpans()
         val root = spans.find { it.name == "root" }!!
         val child = spans.find { it.name == "async-child" }!!
-        assertEquals(root.traceId, child.traceId)
-        assertEquals(root.spanId, child.parentSpanId)
+        assertThat(child.traceId).isEqualTo(root.traceId)
+        assertThat(child.parentSpanId).isEqualTo(root.spanId)
     }
 
     @Test
@@ -382,8 +385,8 @@ class DefaultTelemetryTest {
         // then
         // - typed attributes are present on the exported span
         val span = telemetry.inMemorySpans().find { it.name == "operation" }!!
-        assertEquals(123L, span.attributes.get(AttributeKey.longKey("user.id")))
-        assertEquals(true, span.attributes.get(AttributeKey.booleanKey("success")))
+        assertThat(span.attributes.get(AttributeKey.longKey("user.id"))).isEqualTo(123L)
+        assertThat(span.attributes.get(AttributeKey.booleanKey("success"))).isTrue()
     }
 
     @Test
@@ -405,9 +408,9 @@ class DefaultTelemetryTest {
             .name("logging_counter")
             .tag("sink", "logging")
             .counter()
-        assertNotNull(logged)
-        assertEquals("logging_counter", logged!!.id.name)
-        assertTrue(logged.id.tags.any { it.key == "sink" && it.value == "logging" })
+        assertThat(logged).isNotNull
+        assertThat(logged!!.id.name).isEqualTo("logging_counter")
+        assertThat(logged.id.tags.any { it.key == "sink" && it.value == "logging" }).isTrue()
     }
 
     @Test
@@ -415,7 +418,7 @@ class DefaultTelemetryTest {
         // given
         val t = telemetry(metricsExporters = setOf(MetricsExporter.OTLP))
         val composite = t.registry() as CompositeMeterRegistry
-        // Register counter explicitly so it propagates to all child registries
+        // - register counter explicitly so it propagates to all child registries
         val counter = Counter.builder("otlp_counter").tags("sink", "otlp").register(composite)
 
         // when
@@ -429,8 +432,8 @@ class DefaultTelemetryTest {
             .name("otlp_counter")
             .tag("sink", "otlp")
             .counter()
-        assertNotNull(otlp)
-        assertEquals("otlp_counter", otlp!!.id.name)
-        assertTrue(otlp.id.tags.any { it.key == "sink" && it.value == "otlp" })
+        assertThat(otlp).isNotNull
+        assertThat(otlp!!.id.name).isEqualTo("otlp_counter")
+        assertThat(otlp.id.tags.any { it.key == "sink" && it.value == "otlp" }).isTrue()
     }
 }

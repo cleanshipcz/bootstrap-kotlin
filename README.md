@@ -9,6 +9,7 @@ Offers a template for a Kotlin application including features like:
 * Gradle convention plugin for dependency management
 * Code style enforcement using ktlint
 * Static analysis using Detekt
+* Code coverage using Jacoco
 * Telemetry facade (see `telemetry/README.md`)
 
 ## Build and Run

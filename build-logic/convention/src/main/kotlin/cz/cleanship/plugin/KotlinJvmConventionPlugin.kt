@@ -46,6 +46,10 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
                 "io.gitlab.arturbosch.detekt:detekt-formatting:${libs.findVersion("detekt").get()}",
             )
 
+            // Test Libraries
+            dependencies.add("testImplementation", libs.findLibrary("assertjCore").get())
+            dependencies.add("testImplementation", libs.findLibrary("mockk").get())
+
             tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
                 useJUnitPlatform()
                 testLogging {

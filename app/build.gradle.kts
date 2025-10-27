@@ -1,6 +1,6 @@
 plugins {
-    // Apply the shared build logic from a convention plugin.
-    alias(libs.plugins.cleanship.kotlin.convention)
+    // Apply the shared build logic from a convention plugin (includes telemetry).
+    alias(libs.plugins.cleanship.kotlin.library)
 
     // Apply the Application plugin to add support for building an executable JVM application.
     application

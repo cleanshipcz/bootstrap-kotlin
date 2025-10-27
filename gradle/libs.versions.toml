@@ -51,3 +51,4 @@ detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
 
 # Plugins defined in this project
 cleanship-kotlin-convention = { id = "cleanship.kotlin.convention" }
+cleanship-kotlin-library = { id = "cleanship.kotlin.library" }

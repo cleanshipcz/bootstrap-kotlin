@@ -255,6 +255,13 @@ class DefaultTelemetry(
         } catch (e: Exception) {
             bootLogger.debug("Failed to shutdown tracer provider", e)
         }
+        
+        // Close all meter registries to release background scheduler threads
+        try {
+            meterRegistry.close()
+        } catch (e: Exception) {
+            bootLogger.debug("Failed to close meter registries", e)
+        }
     }
 
     // ---------- Helpers ----------

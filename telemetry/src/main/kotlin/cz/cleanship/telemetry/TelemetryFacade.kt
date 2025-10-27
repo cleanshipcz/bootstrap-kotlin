@@ -166,7 +166,7 @@ interface TimerHandle {
  * Use cases: queue depth, pool utilization/size, cache entries.
  * Thread-safe; reuse handles.
  */
-interface GaugeHandle {
+fun interface GaugeHandle {
     /**
      * Sets the current gauge value.
      *

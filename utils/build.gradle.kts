@@ -1,8 +1,6 @@
 plugins {
     // Apply the shared build logic from a convention plugin (includes telemetry).
     alias(libs.plugins.cleanship.kotlin.library)
-    // Apply Kotlin Serialization plugin from `gradle/libs.versions.toml`.
-    alias(libs.plugins.kotlinPluginSerialization)
 }
 
 dependencies {

@@ -15,9 +15,9 @@ class KotlinLibraryConventionPlugin : Plugin<Project> {
             // Apply the base convention plugin
             apply<KotlinJvmConventionPlugin>()
 
-            // Add telemetry as a dependency
+            // Add telemetry as a dependency (using api to expose transitive dependencies)
             dependencies {
-                add("implementation", project(":telemetry"))
+                add("api", project(":telemetry"))
             }
         }
     }

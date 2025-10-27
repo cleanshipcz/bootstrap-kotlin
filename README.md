@@ -54,3 +54,43 @@ This project uses a version catalog (see `gradle/libs.versions.toml`) to declare
 * Configuration lives in `detekt.yml` at the project root. Adjust rules there to fit your needs.
 * Formatting rules are enabled via `detekt-formatting` to align with ktlint.
 * To use a baseline, generate one with `./gradlew detektBaseline` and configure the `baseline` property in the Detekt settings (see `build-logic/convention/src/main/kotlin/cz/cleanship/plugin/KotlinJvmConventionPlugin.kt`).
+
+**Disabling code analysis for local development:**
+
+When prototyping or testing, you may want to skip code analysis (ktlint + Detekt) to speed up builds. You can disable it in three ways:
+
+1. **Uncomment in `gradle.properties`** (tracked in git, affects all developers):
+   ```properties
+   skipLocalCodeAnalysis=true
+   ```
+
+2. **Use command-line flag** (temporary, single build):
+   ```bash
+   ./gradlew build -PskipLocalCodeAnalysis=true
+   ```
+
+3. **Create `gradle.local.properties`** (recommended for local-only overrides, already in `.gitignore`):
+   ```properties
+   skipLocalCodeAnalysis=true
+   ```
+
+By default, code analysis is enabled to ensure code quality. CI/CD pipelines will always enforce it.
+
+## Features
+
+### Shared build logic
+
+* This project uses a shared build logic in `build-logic`.
+* It is based on the [Gradle Kotlin DSL](https://docs.gradle.org/current/userguide/kotlin_dsl.html).
+* Use plugin `cleanship.kotlin.library` to make use of the shared build logic.
+  ```kotlin
+  plugins {
+      alias(libs.plugins.cleanship.kotlin.library)
+  }
+  ```
+
+### Telemetry
+
+* This project uses [OpenTelemetry](https://opentelemetry.io/) for telemetry.
+* See `telemetry/README.md` for more details.
+* Included in the `cleanship.kotlin.library` plugin.

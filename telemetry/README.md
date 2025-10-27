@@ -423,16 +423,8 @@ log.atInfo().addKeyValue("user", 42).addKeyValue("order", 123).log("Processed or
 ### Using the sample Logback config
 
 1. Copy `telemetry/logback.sample.xml` into your application as `src/main/resources/logback.xml`.
-2. Ensure your application module declares logging dependencies:
 
-```kotlin
-dependencies {
-    implementation(libs.logbackClassic)
-    implementation(libs.logstashLogbackEncoder)
-}
-```
-
-3. Start your app. Logs will be JSON on STDOUT and include `trace_id`/`span_id` when emitted inside `telemetry.inSpan { ... }`.
+2. Start your app. Logs will be JSON on STDOUT and include `trace_id`/`span_id` when emitted inside `telemetry.inSpan { ... }`.
 
 ## Extending and customizing logging
 

@@ -31,11 +31,13 @@ tasks {
 
 gradlePlugin {
     plugins {
-        register("kotlinJvmLibrary") {
-            id = libs.plugins.cleanship.kotlin.convention
-                .get()
-                .pluginId
+        register("kotlinJvmConvention") {
+            id = libs.plugins.cleanship.kotlin.convention.get().pluginId
             implementationClass = "cz.cleanship.plugin.KotlinJvmConventionPlugin"
+        }
+        register("kotlinLibrary") {
+            id = libs.plugins.cleanship.kotlin.library.get().pluginId
+            implementationClass = "cz.cleanship.plugin.KotlinLibraryConventionPlugin"
         }
     }
 }

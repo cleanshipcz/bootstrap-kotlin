@@ -16,35 +16,55 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
 
             apply(plugin = "org.jetbrains.kotlin.jvm")
             apply(plugin = "org.jetbrains.kotlin.plugin.serialization")
-            apply(plugin = "org.jlleitschuh.gradle.ktlint")
-            apply(plugin = "io.gitlab.arturbosch.detekt")
             apply(plugin = "jacoco")
+
+            // Check if local code analysis should be skipped (for faster local development)
+            val skipLocalCodeAnalysis = project.findProperty("skipLocalCodeAnalysis")?.toString()?.toBoolean()
+                ?: System.getProperty("skipLocalCodeAnalysis")?.toBoolean()
+                ?: false
+
+            if (!skipLocalCodeAnalysis) {
+                apply(plugin = "org.jlleitschuh.gradle.ktlint")
+                apply(plugin = "io.gitlab.arturbosch.detekt")
+            }
 
             extensions.configure(org.jetbrains.kotlin.gradle.dsl.KotlinJvmProjectExtension::class.java) {
                 jvmToolchain(21)
             }
 
-            // Ktlint
-            extensions.configure(org.jlleitschuh.gradle.ktlint.KtlintExtension::class.java) {
-                version.set(libs.findVersion("ktlint").get().toString())
-                filter { exclude("**/generated/**") }
-                reporters { reporter(ReporterType.CHECKSTYLE) }
+            // Ktlint - only configure if code analysis is enabled
+            if (!skipLocalCodeAnalysis) {
+                extensions.configure(org.jlleitschuh.gradle.ktlint.KtlintExtension::class.java) {
+                    version.set(libs.findVersion("ktlint").get().toString())
+                    filter { exclude("**/generated/**") }
+                    reporters { reporter(ReporterType.CHECKSTYLE) }
+                }
             }
 
-            // Detekt
-            extensions.configure(DetektExtension::class.java) {
-                toolVersion = libs.findVersion("detekt").get().toString()
-                buildUponDefaultConfig = true
-                config.setFrom(files(rootProject.file("detekt.yml")))
-                allRules = false
-                parallel = true
-                basePath = projectDir.absolutePath
+            // Detekt - only configure if code analysis is enabled
+            if (!skipLocalCodeAnalysis) {
+                extensions.configure(DetektExtension::class.java) {
+                    toolVersion = libs.findVersion("detekt").get().toString()
+                    buildUponDefaultConfig = true
+                    config.setFrom(files(rootProject.file("detekt.yml")))
+                    allRules = false
+                    parallel = true
+                    basePath = projectDir.absolutePath
+                }
+                // Enable formatting rules for Detekt
+                dependencies.add(
+                    "detektPlugins",
+                    "io.gitlab.arturbosch.detekt:detekt-formatting:${libs.findVersion("detekt").get()}"
+                )
             }
-            // Enable formatting rules for Detekt
-            dependencies.add(
-                "detektPlugins",
-                "io.gitlab.arturbosch.detekt:detekt-formatting:${libs.findVersion("detekt").get()}",
-            )
+
+            // Kotlin Coroutines - available in all modules
+            dependencies.add("api", libs.findLibrary("kotlinxCoroutines").get())
+
+            // Test Libraries
+            dependencies.add("testImplementation", libs.findLibrary("assertjCore").get())
+            dependencies.add("testImplementation", libs.findLibrary("mockk").get())
+            dependencies.add("testImplementation", libs.findLibrary("kotlinxCoroutinesTest").get())
 
             tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
                 useJUnitPlatform()
@@ -54,13 +74,16 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
                 // Ensure coverage is generated after tests
                 finalizedBy(tasks.named("jacocoTestReport"))
             }
-            tasks.withType<Detekt>().configureEach {
-                jvmTarget = "21"
-                reports {
-                    xml.required.set(true)
-                    sarif.required.set(true)
-                    html.required.set(false)
-                    txt.required.set(false)
+            // Configure Detekt tasks only if code analysis is enabled
+            if (!skipLocalCodeAnalysis) {
+                tasks.withType<Detekt>().configureEach {
+                    jvmTarget = "21"
+                    reports {
+                        xml.required.set(true)
+                        sarif.required.set(true)
+                        html.required.set(false)
+                        txt.required.set(false)
+                    }
                 }
             }
             // Configure JaCoCo XML reports for SonarCloud
@@ -71,7 +94,14 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
                 }
             }
 
-            tasks.named("check").configure { dependsOn("ktlintCheck", "detekt", "jacocoTestReport") }
+            // Configure check task dependencies based on whether code analysis is enabled
+            tasks.named("check").configure {
+                val checkDependencies = mutableListOf("jacocoTestReport")
+                if (!skipLocalCodeAnalysis) {
+                    checkDependencies.addAll(listOf("ktlintCheck", "detekt"))
+                }
+                dependsOn(checkDependencies)
+            }
         }
     }
 }

@@ -15,7 +15,9 @@ style:
   MagicNumber:
     active: false        # allow magic numbers; enable and configure ignoreNumbers if you want stricter checks
   MaxLineLength:
-    active: false        # enforce maximum line length via editor/ktlint instead
+    active: false        # do not enforce maximum line length, it's not the 90's anymore
+  WildcardImport:
+    active: false
 
 naming:
   TopLevelPropertyNaming:
@@ -23,8 +25,10 @@ naming:
 
 # formatting rules come from detekt-formatting (ktlint)
 # You can toggle individual rules here if needed, e.g.:
-# formatting:
-#   MaximumLineLength:
-#     active: false
-#   NoWildcardImports:
-#     active: true
+formatting:
+  MaximumLineLength:
+    active: false
+  NoWildcardImports:
+    active: false
+  ArgumentListWrapping:
+    active: false

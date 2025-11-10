@@ -1,10 +1,22 @@
+[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=cleanshipcz_bootstrap-kotlin)
+
 # Bootstrap Kotlin Application
+
+## Usage
+
+Offers a template for a Kotlin application including features like:
+
+* Gradle convention plugin for dependency management
+* Code style enforcement using ktlint
+* Static analysis using Detekt
+* Code coverage using Jacoco
+* Telemetry facade (see `telemetry/README.md`)
 
 ## Build and Run
 
 This project uses [Gradle](https://gradle.org/).
-To build and run the application, use the *Gradle* tool window by clicking the Gradle icon in the right-hand toolbar,
-or run it directly from the terminal:
+
+To build and run the application:
 
 * Run `./gradlew run` to build and run the application.
 * Run `./gradlew build` to only build the application.
@@ -20,13 +32,12 @@ This is the suggested way to use Gradle in production projects.
 
 ### Project Structure
 
-This project follows the suggested multi-module setup and consists of the `app` and `utils` subprojects.
-The shared build logic was extracted to a convention plugin located in `buildSrc`.
+This project follows a multi-module setup and consists of the `app` (runnable service) and `utils` (library) subprojects as examples.
+The shared build logic is extracted to a convention plugin located in `build-logic`.
 
 ### Dependency Management
 
-This project uses a version catalog (see `gradle/libs.versions.toml`) to declare and version dependencies
-and both a build cache and a configuration cache (see `gradle.properties`).
+This project uses a version catalog (see `gradle/libs.versions.toml`) to declare and version dependencies.
 
 ### Code style
 
@@ -43,3 +54,43 @@ and both a build cache and a configuration cache (see `gradle.properties`).
 * Configuration lives in `detekt.yml` at the project root. Adjust rules there to fit your needs.
 * Formatting rules are enabled via `detekt-formatting` to align with ktlint.
 * To use a baseline, generate one with `./gradlew detektBaseline` and configure the `baseline` property in the Detekt settings (see `build-logic/convention/src/main/kotlin/cz/cleanship/plugin/KotlinJvmConventionPlugin.kt`).
+
+**Disabling code analysis for local development:**
+
+When prototyping or testing, you may want to skip code analysis (ktlint + Detekt) to speed up builds. You can disable it in three ways:
+
+1. **Uncomment in `gradle.properties`** (tracked in git, affects all developers):
+   ```properties
+   skipLocalCodeAnalysis=true
+   ```
+
+2. **Use command-line flag** (temporary, single build):
+   ```bash
+   ./gradlew build -PskipLocalCodeAnalysis=true
+   ```
+
+3. **Create `gradle.local.properties`** (recommended for local-only overrides, already in `.gitignore`):
+   ```properties
+   skipLocalCodeAnalysis=true
+   ```
+
+By default, code analysis is enabled to ensure code quality. CI/CD pipelines will always enforce it.
+
+## Features
+
+### Shared build logic
+
+* This project uses a shared build logic in `build-logic`.
+* It is based on the [Gradle Kotlin DSL](https://docs.gradle.org/current/userguide/kotlin_dsl.html).
+* Use plugin `cleanship.kotlin.library` to make use of the shared build logic.
+  ```kotlin
+  plugins {
+      alias(libs.plugins.cleanship.kotlin.library)
+  }
+  ```
+
+### Telemetry
+
+* This project uses [OpenTelemetry](https://opentelemetry.io/) for telemetry.
+* See `telemetry/README.md` for more details.
+* Included in the `cleanship.kotlin.library` plugin.

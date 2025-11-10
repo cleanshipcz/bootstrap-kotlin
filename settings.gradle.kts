@@ -3,6 +3,16 @@
 // It is also used for some aspects of project-wide configuration, like managing plugins, dependencies, etc.
 // https://docs.gradle.org/current/userguide/settings_file_basics.html
 
+// Load local properties if they exist (for developer-specific overrides)
+val localPropertiesFile = file("gradle.local.properties")
+if (localPropertiesFile.exists()) {
+    val localProperties = java.util.Properties()
+    localProperties.load(localPropertiesFile.inputStream())
+    localProperties.forEach { key, value ->
+        System.setProperty(key.toString(), value.toString())
+    }
+}
+
 pluginManagement {
     includeBuild("build-logic")
     repositories {
@@ -30,5 +40,6 @@ plugins {
 // Learn more about structuring projects with Gradle - https://docs.gradle.org/8.7/userguide/multi_project_builds.html
 include(":app")
 include(":utils")
+include(":telemetry")
 
 rootProject.name = "bootstrap-kotlin"

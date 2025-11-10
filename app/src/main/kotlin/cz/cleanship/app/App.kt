@@ -1,20 +1,28 @@
 package cz.cleanship.app
 
-import cz.cleanship.utils.Printer
+import cz.cleanship.telemetry.Telemetry
+import cz.cleanship.telemetry.logging.info
+import cz.cleanship.utils.Calculator
+import kotlinx.coroutines.runBlocking
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
-// TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-fun main() {
-    val name = "Kotlin"
-    // TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-    // to see how IntelliJ IDEA suggests fixing it.
-    val message = "Hello, $name!"
-    val printer = Printer(message)
-    printer.printMessage()
+val log: Logger = LoggerFactory.getLogger("App")
+val telemetry = Telemetry.create()
+val logCounter = telemetry.counter("LogCounter")
 
-    for (i in 1..5) {
-        // TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-        // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        println("i = $i")
+fun main() = runBlocking {
+    telemetry.inSpan("main") {
+        log.info("Start")
+        val calculator = Calculator()
+        val a = 7
+        for (b in 1..5) {
+            logCounter.increment()
+            log.info(
+                "Result of ($a + $b) = ${calculator.add(a, b)}",
+                fields = mapOf("result" to calculator.add(a, b)),
+            )
+        }
+        log.info("Done")
     }
 }

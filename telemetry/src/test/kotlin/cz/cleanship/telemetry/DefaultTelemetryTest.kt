@@ -35,7 +35,7 @@ class DefaultTelemetryTest {
             serviceName = serviceName,
             tracesExporters = setOf(TracesExporter.INMEMORY_FOR_TESTS),
             metricsExporters = metricsExporters,
-            otlpEndpoint = null,
+            otlpEndpoint = "http://localhost:4318",
         ),
     )
 

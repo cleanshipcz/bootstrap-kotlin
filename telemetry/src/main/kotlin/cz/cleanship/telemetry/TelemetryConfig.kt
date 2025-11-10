@@ -14,7 +14,7 @@ package cz.cleanship.telemetry
 data class TelemetryConfig(
     val serviceName: String = System.getProperty("telemetry.service.name")
         ?: System.getenv("TELEMETRY_SERVICE_NAME")
-        ?: "bootstrap-kotlin",
+        ?: "service-name-placeholder",
     val tracesExporters: Set<TracesExporter> = TracesExporter.fromList(
         System.getProperty("telemetry.traces.exporter") ?: System.getenv("TELEMETRY_EXPORTER_TRACES"),
     ),

@@ -1,7 +1,11 @@
 package cz.cleanship.telemetry
 
 import cz.cleanship.telemetry.support.LocalInMemorySpanExporter
-import io.micrometer.core.instrument.*
+import io.micrometer.core.instrument.Clock
+import io.micrometer.core.instrument.Gauge
+import io.micrometer.core.instrument.MeterRegistry
+import io.micrometer.core.instrument.Tag
+import io.micrometer.core.instrument.Timer
 import io.micrometer.core.instrument.composite.CompositeMeterRegistry
 import io.micrometer.core.instrument.logging.LoggingMeterRegistry
 import io.micrometer.core.instrument.logging.LoggingRegistryConfig
@@ -42,6 +46,9 @@ import java.util.concurrent.atomic.AtomicReference
 class DefaultTelemetry(
     private val config: TelemetryConfig = TelemetryConfig.fromEnvironment(),
     private val testSpanExporter: SpanExporter? = null,
+    private val clock: Clock = Clock.SYSTEM,
+    instrumentationScopeName: String = "cz.cleanship.telemetry",
+    instrumentationScopeVersion: String = "1.0.0",
 ) : TelemetryFacade {
 
     private val meterRegistry: CompositeMeterRegistry = CompositeMeterRegistry()
@@ -53,10 +60,9 @@ class DefaultTelemetry(
     private var localInMemory: LocalInMemorySpanExporter? = null
     private val bootLogger = LoggerFactory.getLogger(DefaultTelemetry::class.java)
 
-    init {
-        // Metrics registries
-        val simple = SimpleMeterRegistry()
-        meterRegistry.add(simple)
+    private fun initMetricRegistries() {
+        val simpleMeterRegistry = SimpleMeterRegistry()
+        meterRegistry.add(simpleMeterRegistry)
         for (exporter in config.metricsExporters) {
             when (exporter) {
                 MetricsExporter.PROMETHEUS -> {
@@ -72,20 +78,21 @@ class DefaultTelemetry(
 
                             override fun step(): Duration = Duration.ofSeconds(10)
                         },
-                        Clock.SYSTEM,
+                        clock,
                     )
                     meterRegistry.add(logging)
                 }
 
                 MetricsExporter.OTLP -> {
-                    val endpoint = config.otlpEndpoint ?: "http://localhost:4318"
+                    check(config.otlpEndpoint != null) { "telemetry.otlp.endpoint is not configured" }
+                    val endpoint = config.otlpEndpoint
                     val otlp = OtlpMeterRegistry(
                         object : OtlpConfig {
                             override fun get(key: String): String? = null
 
                             override fun url(): String = endpoint
                         },
-                        Clock.SYSTEM,
+                        clock,
                     )
                     meterRegistry.add(otlp)
                 }
@@ -94,8 +101,9 @@ class DefaultTelemetry(
                 }
             }
         }
+    }
 
-        // Tracing
+    private fun initTracing(): SdkTracerProvider {
         val spanExporters = mutableListOf<Pair<SpanExporter, Boolean>>() // exporter to isInMemory
         for (exporter in config.tracesExporters) {
             when (exporter) {
@@ -138,12 +146,15 @@ class DefaultTelemetry(
             }
             tracerProviderBuilder.addSpanProcessor(processor)
         }
-        val tracerProvider = tracerProviderBuilder.build()
-        sdkTracerProvider = tracerProvider
+        return tracerProviderBuilder.build()
+    }
 
+    init {
+        initMetricRegistries()
+        sdkTracerProvider = initTracing()
         openTelemetry = OpenTelemetrySdk
             .builder()
-            .setTracerProvider(tracerProvider)
+            .setTracerProvider(sdkTracerProvider)
             .setPropagators(
                 ContextPropagators.create(
                     io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator
@@ -151,7 +162,7 @@ class DefaultTelemetry(
                 ),
             ).build()
 
-        tracer = openTelemetry.getTracer("cz.cleanship.telemetry", "1.0.0")
+        tracer = openTelemetry.getTracer(instrumentationScopeName, instrumentationScopeVersion)
     }
 
     override fun counter(name: String, tags: Map<String, String>): CounterHandle {
@@ -255,7 +266,7 @@ class DefaultTelemetry(
         } catch (e: Exception) {
             bootLogger.debug("Failed to shutdown tracer provider", e)
         }
-        
+
         // Close all meter registries to release background scheduler threads
         try {
             meterRegistry.close()

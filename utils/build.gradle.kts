@@ -1,6 +1,6 @@
 plugins {
     // Apply the shared build logic from a convention plugin (includes telemetry).
-    alias(libs.plugins.cleanship.kotlin.library)
+    alias(libs.plugins.cleanship.kotlin.convention)
 }
 
 dependencies {

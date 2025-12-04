@@ -15,48 +15,75 @@ export function SubjectList({
   onCreateSubject,
 }: SubjectListProps) {
   const [name, setName] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    if (!name.trim()) {
+    const trimmed = name.trim()
+    if (!trimmed) {
       return
     }
-    await onCreateSubject(name.trim())
+    setIsSubmitting(true)
+    await onCreateSubject(trimmed)
     setName('')
+    setShowForm(false)
+    setIsSubmitting(false)
   }
 
   return (
-    <div className="panel">
-      <header className="panel-header">
+    <section className="subjects-view fade-in">
+      <div className="view-header">
+        <div>
+          <p className="eyebrow">Library</p>
         <h2>Subjects</h2>
-      </header>
-      <div className="list">
-        {subjects.length === 0 && <p className="muted">No subjects yet.</p>}
+        </div>
+        <button className="ghost-button" onClick={() => setShowForm(true)}>
+          Add Subject
+        </button>
+      </div>
+
+      <ul className="subjects-list">
+        {subjects.length === 0 && <li className="muted">No subjects yet. Create your first one.</li>}
         {subjects.map((subject) => (
+          <li key={subject.id ?? subject.name}>
           <button
-            key={subject.id ?? subject.name}
-            className={`list-item ${selectedSubjectId === subject.id ? 'active' : ''}`}
+              className={`subject-pill ${selectedSubjectId === subject.id ? 'selected' : ''}`}
             onClick={() => subject.id && onSelectSubject(subject.id)}
           >
-            {subject.name}
-            {subject.topics.length > 0 && <span className="badge">{subject.topics.length}</span>}
+              <span className="subject-name">{subject.name}</span>
+              <span className="subject-meta">{subject.topics.length} topics</span>
           </button>
+          </li>
         ))}
-      </div>
-      <form className="stack-form" onSubmit={handleSubmit}>
-        <label htmlFor="subject-name">Add Subject</label>
+      </ul>
+
+      {showForm && (
+        <form className="inline-form" onSubmit={handleSubmit}>
+          <label htmlFor="subject-name" className="form-label">
+            Subject name
+          </label>
+          <div className="inline-form-row">
         <input
           id="subject-name"
           type="text"
-          placeholder="Subject name"
+              placeholder="e.g. Organic Chemistry"
           value={name}
           onChange={(event) => setName(event.target.value)}
+              autoFocus
         />
-        <button type="submit" className="btn btn-primary">
-          Create Subject
+            <div className="form-actions">
+              <button type="button" className="ghost-button" onClick={() => setShowForm(false)}>
+                Cancel
+              </button>
+              <button type="submit" className="btn-primary" disabled={isSubmitting}>
+                Save
         </button>
+            </div>
+          </div>
       </form>
-    </div>
+      )}
+    </section>
   )
 }
 

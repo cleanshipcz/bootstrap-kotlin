@@ -8,4 +8,5 @@ import org.springframework.stereotype.Repository
 interface FlashcardRepository : JpaRepository<Flashcard, Long> {
     fun findByTopicId(topicId: Long): List<Flashcard>
     fun existsByTopicIdAndQuestion(topicId: Long, question: String): Boolean
+    fun existsByTopicIdAndQuestionAndIdNot(topicId: Long, question: String, id: Long): Boolean
 }

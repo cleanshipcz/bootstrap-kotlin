@@ -20,13 +20,22 @@ fun Topic.toSummaryDto(): TopicSummaryDto = TopicSummaryDto(
     name = name,
 )
 
-fun Topic.toDto(includeFlashcards: Boolean = true): TopicDto = TopicDto(
+fun Topic.toDto(includeFlashcards: Boolean = true): TopicDto {
+    val flashcardsPayload = if (includeFlashcards) {
+        flashcards.map { it.toDto() }
+    } else {
+        emptyList()
+    }
+
+    return TopicDto(
     id = id,
     subjectId = subject?.id ?: error("Topic $id is not associated with a subject"),
     name = name,
     studyPassage = studyPassage,
-    flashcards = if (includeFlashcards) flashcards.map { it.toDto() } else emptyList(),
+        flashcards = flashcardsPayload,
+        flashcardCount = flashcards.size,
 )
+}
 
 fun Subject.toDto(includeTopics: Boolean = true): SubjectDto = SubjectDto(
     id = id,

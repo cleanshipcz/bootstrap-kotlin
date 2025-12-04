@@ -25,6 +25,7 @@ data class TopicDto(
     val name: String,
     val studyPassage: String,
     val flashcards: List<FlashcardDto> = emptyList(),
+    val flashcardCount: Int = flashcards.size,
 )
 
 data class CreateTopicRequest(

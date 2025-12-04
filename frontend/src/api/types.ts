@@ -15,6 +15,7 @@ export interface TopicDto {
   name: string
   studyPassage: string
   flashcards: FlashcardDto[]
+  flashcardCount: number
 }
 
 export interface CreateSubjectRequest {

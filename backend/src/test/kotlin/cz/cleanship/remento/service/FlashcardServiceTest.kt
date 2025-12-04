@@ -7,6 +7,7 @@ import cz.cleanship.remento.domain.Topic
 import cz.cleanship.remento.exception.DuplicateFlashcardQuestionException
 import cz.cleanship.remento.repository.FlashcardRepository
 import cz.cleanship.remento.repository.TopicRepository
+import cz.cleanship.remento.common.dto.UpdateFlashcardRequest
 import cz.cleanship.telemetry.CounterHandle
 import cz.cleanship.telemetry.GaugeHandle
 import cz.cleanship.telemetry.SpanKind
@@ -104,6 +105,59 @@ class FlashcardServiceTest {
         assertThatThrownBy { flashcardService.deleteFlashcard(topic.id!!, 1L) }
             .isInstanceOf(ResponseStatusException::class.java)
             .hasMessageContaining("does not belong to topic")
+    }
+
+    @Test
+    fun `updateFlashcard should persist changes`() {
+        val flashcard = Flashcard(id = 10L, question = "Old", answer = "Answer", topic = topic)
+        val request = UpdateFlashcardRequest(question = "New Question", answer = "New Answer")
+        every { flashcardRepository.findById(10L) } returns java.util.Optional.of(flashcard)
+        every { flashcardRepository.existsByTopicIdAndQuestionAndIdNot(topic.id!!, "New Question", 10L) } returns false
+        every { flashcardRepository.save(flashcard) } returns flashcard
+
+        val result = flashcardService.updateFlashcard(topic.id!!, 10L, request)
+
+        assertThat(result.question).isEqualTo("New Question")
+        assertThat(result.answer).isEqualTo("New Answer")
+        verify(exactly = 1) { flashcardRepository.save(flashcard) }
+    }
+
+    @Test
+    fun `updateFlashcard should reject duplicates`() {
+        val flashcard = Flashcard(id = 11L, question = "Old", answer = "Answer", topic = topic)
+        val request = UpdateFlashcardRequest(question = "Duplicate", answer = "Keep")
+        every { flashcardRepository.findById(11L) } returns java.util.Optional.of(flashcard)
+        every {
+            flashcardRepository.existsByTopicIdAndQuestionAndIdNot(topic.id!!, "Duplicate", 11L)
+        } returns true
+
+        assertThatThrownBy { flashcardService.updateFlashcard(topic.id!!, 11L, request) }
+            .isInstanceOf(DuplicateFlashcardQuestionException::class.java)
+    }
+
+    @Test
+    fun `updateFlashcard should verify topic ownership`() {
+        val otherTopic = Topic(id = 9L, name = "Other", studyPassage = "text", subject = subject)
+        val flashcard = Flashcard(id = 12L, question = "Old", answer = "Answer", topic = otherTopic)
+        every { flashcardRepository.findById(12L) } returns java.util.Optional.of(flashcard)
+
+        assertThatThrownBy {
+            flashcardService.updateFlashcard(topic.id!!, 12L, UpdateFlashcardRequest("Q", "A"))
+        }
+            .isInstanceOf(ResponseStatusException::class.java)
+            .hasMessageContaining("does not belong to topic")
+    }
+
+    @Test
+    fun `updateFlashcard should reject blank data`() {
+        val flashcard = Flashcard(id = 13L, question = "Old", answer = "Answer", topic = topic)
+        every { flashcardRepository.findById(13L) } returns java.util.Optional.of(flashcard)
+
+        assertThatThrownBy {
+            flashcardService.updateFlashcard(topic.id!!, 13L, UpdateFlashcardRequest(" ", "A"))
+        }
+            .isInstanceOf(ResponseStatusException::class.java)
+            .hasMessageContaining("must not be blank")
     }
 }
 

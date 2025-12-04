@@ -2,6 +2,7 @@ package cz.cleanship.remento.service
 
 import cz.cleanship.remento.common.dto.CreateFlashcardRequest
 import cz.cleanship.remento.common.dto.FlashcardDto
+import cz.cleanship.remento.common.dto.UpdateFlashcardRequest
 import cz.cleanship.remento.domain.Flashcard
 import cz.cleanship.remento.exception.DuplicateFlashcardQuestionException
 import cz.cleanship.remento.mapper.toDto
@@ -21,6 +22,7 @@ import kotlin.system.measureTimeMillis
 interface IFlashcardService {
     fun getFlashcards(topicId: Long): List<FlashcardDto>
     fun createFlashcard(topicId: Long, request: CreateFlashcardRequest): FlashcardDto
+    fun updateFlashcard(topicId: Long, flashcardId: Long, request: UpdateFlashcardRequest): FlashcardDto
     fun deleteFlashcard(topicId: Long, flashcardId: Long)
 }
 
@@ -35,12 +37,53 @@ open class FlashcardService(
     private val listCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "list"))
     private val createCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "create"))
     private val deleteCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "delete"))
+    private val updateCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "update"))
     private val listTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "list"))
     private val createTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "create"))
     private val deleteTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "delete"))
+    private val updateTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "update"))
 
     companion object {
         private val log = LoggerFactory.getLogger(FlashcardService::class.java)
+    }
+
+    override fun updateFlashcard(topicId: Long, flashcardId: Long, request: UpdateFlashcardRequest): FlashcardDto {
+        val flashcard = flashcardRepository.findById(flashcardId)
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Flashcard $flashcardId not found") }
+
+        if (flashcard.topic?.id != topicId) {
+            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Flashcard $flashcardId does not belong to topic $topicId")
+        }
+
+        val normalizedQuestion = request.question.trim()
+        val normalizedAnswer = request.answer.trim()
+
+        if (normalizedQuestion.isBlank() || normalizedAnswer.isBlank()) {
+            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Question and answer must not be blank")
+        }
+
+        if (flashcardRepository.existsByTopicIdAndQuestionAndIdNot(topicId, normalizedQuestion, flashcardId)) {
+            throw DuplicateFlashcardQuestionException(topicId, normalizedQuestion)
+        }
+
+        return tracedOperation(
+            name = "flashcards.update",
+            timer = updateTimer,
+            attributes = mapOf("component" to "FlashcardService", "topicId" to topicId, "flashcard_id" to flashcardId),
+        ) { span ->
+            flashcard.question = normalizedQuestion
+            flashcard.answer = normalizedAnswer
+            val updatedFlashcard = flashcardRepository.save(flashcard).toDto()
+            updateCounter.increment()
+            log.info(
+                "Updated flashcard id={} topic={} traceId={} spanId={}",
+                flashcardId,
+                topicId,
+                span.traceId,
+                span.spanId,
+            )
+            updatedFlashcard
+        }
     }
 
     override fun getFlashcards(topicId: Long): List<FlashcardDto> {

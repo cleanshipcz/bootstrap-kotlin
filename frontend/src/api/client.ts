@@ -6,6 +6,7 @@ import type {
   FlashcardDto,
   SubjectDto,
   TopicDto,
+  UpdateFlashcardRequest,
   UpdateSubjectRequest,
   UpdateTopicRequest,
 } from './types'
@@ -112,6 +113,13 @@ class ApiClient {
   createFlashcard(topicId: number, request: CreateFlashcardRequest): Promise<FlashcardDto> {
     return this.request(`/topics/${topicId}/flashcards`, {
       method: 'POST',
+      body: JSON.stringify(request),
+    })
+  }
+
+  updateFlashcard(topicId: number, flashcardId: number, request: UpdateFlashcardRequest): Promise<FlashcardDto> {
+    return this.request(`/topics/${topicId}/flashcards/${flashcardId}`, {
+      method: 'PUT',
       body: JSON.stringify(request),
     })
   }

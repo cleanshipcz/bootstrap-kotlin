@@ -2,6 +2,7 @@ package cz.cleanship.remento.controller
 
 import cz.cleanship.remento.common.dto.CreateFlashcardRequest
 import cz.cleanship.remento.common.dto.FlashcardDto
+import cz.cleanship.remento.common.dto.UpdateFlashcardRequest
 import cz.cleanship.remento.service.IFlashcardService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -10,6 +11,7 @@ import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
@@ -41,4 +43,12 @@ open class FlashcardController(
         flashcardService.deleteFlashcard(topicId, flashcardId)
         return ResponseEntity.noContent().build()
     }
+
+    @PutMapping("/{flashcardId}")
+    fun updateFlashcard(
+        @PathVariable topicId: Long,
+        @PathVariable flashcardId: Long,
+        @RequestBody request: UpdateFlashcardRequest,
+    ): ResponseEntity<FlashcardDto> =
+        ResponseEntity.ok(flashcardService.updateFlashcard(topicId, flashcardId, request))
 }

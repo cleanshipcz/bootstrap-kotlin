@@ -41,6 +41,7 @@ Thumbs.db
 # Application specific
 gradle.local.properties
 *.log
+.env
 
 # Frontend
 frontend/node_modules/

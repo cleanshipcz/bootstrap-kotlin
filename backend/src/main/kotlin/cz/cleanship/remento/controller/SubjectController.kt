@@ -3,7 +3,7 @@ package cz.cleanship.remento.controller
 import cz.cleanship.remento.common.dto.CreateSubjectRequest
 import cz.cleanship.remento.common.dto.SubjectDto
 import cz.cleanship.remento.common.dto.UpdateSubjectRequest
-import cz.cleanship.remento.service.ISubjectService
+import cz.cleanship.remento.service.SubjectService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.CrossOrigin
@@ -20,31 +20,30 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/subjects")
 @CrossOrigin(origins = ["http://localhost:3000", "http://localhost:5173"])
 class SubjectController(
-    private val subjectService: ISubjectService,
+    private val subjectService: SubjectService,
 ) {
 
     @GetMapping
     fun getSubjects(): ResponseEntity<List<SubjectDto>> =
-        ResponseEntity.ok(subjectService.getAllSubjects())
+        ResponseEntity.ok(subjectService.getAll())
 
     @GetMapping("/{subjectId}")
     fun getSubject(@PathVariable subjectId: Long): ResponseEntity<SubjectDto> =
-        ResponseEntity.ok(subjectService.getSubject(subjectId))
+        ResponseEntity.ok(subjectService.getOne(subjectId))
 
     @PostMapping
     fun createSubject(@RequestBody request: CreateSubjectRequest): ResponseEntity<SubjectDto> =
-        ResponseEntity.status(HttpStatus.CREATED).body(subjectService.createSubject(request))
+        ResponseEntity.status(HttpStatus.CREATED).body(subjectService.create(request))
 
     @PutMapping("/{subjectId}")
     fun updateSubject(
         @PathVariable subjectId: Long,
         @RequestBody request: UpdateSubjectRequest,
-    ): ResponseEntity<SubjectDto> = ResponseEntity.ok(subjectService.updateSubject(subjectId, request))
+    ): ResponseEntity<SubjectDto> = ResponseEntity.ok(subjectService.update(subjectId, request))
 
     @DeleteMapping("/{subjectId}")
     fun deleteSubject(@PathVariable subjectId: Long): ResponseEntity<Void> {
-        subjectService.deleteSubject(subjectId)
+        subjectService.delete(subjectId)
         return ResponseEntity.noContent().build()
     }
 }
-

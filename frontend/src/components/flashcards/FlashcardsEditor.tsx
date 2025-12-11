@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { apiClient, ApiError } from '../api/client'
-import type { FlashcardDto } from '../api/types'
-import { Modal } from './Modal'
+import { ApiError } from '@api/client'
+import { flashcardsApi } from '@api/flashcards'
+import { topicsApi } from '@api/topics'
+import type { FlashcardDto } from '@api/types'
+import { Modal } from '@components/ui/Modal'
 import './FlashcardList.css'
 
 const TrashIcon = () => (
@@ -236,7 +238,7 @@ export function FlashcardsEditor({
   }
 
   const syncFromServer = async () => {
-    const refreshed = await apiClient.getTopic(topicId)
+    const refreshed = await topicsApi.getOne(topicId)
     onFlashcardsUpdated(refreshed.flashcards)
     const nextEditable = toEditable(refreshed.flashcards)
     setHistory({ snapshots: [nextEditable], index: 0 })
@@ -268,16 +270,16 @@ export function FlashcardsEditor({
       })
 
       for (const card of toDelete) {
-        await apiClient.deleteFlashcard(topicId, card.id!)
+        await flashcardsApi.delete(topicId, card.id!)
       }
       for (const card of toUpdate) {
-        await apiClient.updateFlashcard(topicId, card.id!, {
+        await flashcardsApi.update(topicId, card.id!, {
           question: card.question.trim(),
           answer: card.answer.trim(),
         })
       }
       for (const card of toCreate) {
-        await apiClient.createFlashcard(topicId, {
+        await flashcardsApi.create(topicId, {
           question: card.question.trim(),
           answer: card.answer.trim(),
         })
@@ -441,4 +443,3 @@ export function FlashcardsEditor({
     </section>
   )
 }
-

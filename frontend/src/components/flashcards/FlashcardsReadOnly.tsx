@@ -1,4 +1,4 @@
-import type { FlashcardDto } from '../api/types'
+import type { FlashcardDto } from '@api/types'
 import './FlashcardList.css'
 
 interface FlashcardsReadOnlyProps {
@@ -50,4 +50,3 @@ export function FlashcardsReadOnly({ topicName, flashcards, onBack, onEdit }: Fl
     </section>
   )
 }
-

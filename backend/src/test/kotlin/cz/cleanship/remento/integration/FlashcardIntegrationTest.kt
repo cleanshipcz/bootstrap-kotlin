@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 class FlashcardIntegrationTest(
     @Autowired private val mockMvc: MockMvc,
     @Autowired private val objectMapper: ObjectMapper,
@@ -134,7 +134,7 @@ class FlashcardIntegrationTest(
     }
 
     private fun createFlashcard(question: String, answer: String): FlashcardDto {
-        val request = CreateFlashcardRequest(question, answer)
+        val request = CreateFlashcardRequest(question = question, answer = answer)
         val content = objectMapper.writeValueAsString(request)
 
         val response = mockMvc.perform(
@@ -165,4 +165,3 @@ class FlashcardIntegrationTest(
             .andExpect(status().isNoContent)
     }
 }
-

@@ -6,6 +6,6 @@ import org.springframework.stereotype.Repository
 
 @Repository
 interface TopicRepository : JpaRepository<Topic, Long> {
-    fun findBySubjectId(subjectId: Long): List<Topic>
+    fun findBySubject_Id(subjectId: Long): List<Topic>
 }
 

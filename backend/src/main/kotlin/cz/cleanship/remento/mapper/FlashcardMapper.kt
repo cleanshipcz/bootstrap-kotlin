@@ -11,6 +11,7 @@ import cz.cleanship.remento.domain.Topic
 fun Flashcard.toDto(): FlashcardDto = FlashcardDto(
     id = id,
     topicId = topic?.id ?: error("Flashcard $id is not associated with a topic"),
+    subjectId = subject?.id ?: topic?.subject?.id ?: error("Flashcard $id is not associated with a subject"),
     question = question,
     answer = answer,
 )

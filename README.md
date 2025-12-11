@@ -6,7 +6,6 @@ Remento is a cross-platform flashcard learning app focused on manual flashcard c
 
 - `backend/` - Spring Boot REST API (Kotlin)
 - `frontend/` - React + TypeScript web application
-- `app/` - Legacy bootstrap code (can be removed later)
 - `utils/` - Shared utilities
 - `telemetry/` - Telemetry facade module
 
@@ -33,20 +32,11 @@ Remento is a cross-platform flashcard learning app focused on manual flashcard c
 
 ### Backend Setup
 
-**Option 1: Using PostgreSQL (Recommended for production-like setup)**
-
 1. **Start PostgreSQL with Docker Compose**:
    ```bash
    docker-compose up -d
    ```
    
-   Or manually create the database:
-   ```sql
-   CREATE DATABASE remento;
-   CREATE USER remento WITH PASSWORD 'remento';
-   GRANT ALL PRIVILEGES ON DATABASE remento TO remento;
-   ```
-
 2. **Run the backend**:
    ```bash
    ./gradlew :backend:bootRun

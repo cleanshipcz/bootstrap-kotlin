@@ -28,6 +28,9 @@ data class Flashcard(
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "topic_id", nullable = false)
     var topic: Topic? = null,
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "subject_id", nullable = false)
+    var subject: Subject? = null,
 ) {
     @Suppress("unused")
     constructor() : this(
@@ -36,5 +39,6 @@ data class Flashcard(
         answer = "",
         createdAt = Instant.now(),
         topic = null,
+        subject = null,
     )
 }

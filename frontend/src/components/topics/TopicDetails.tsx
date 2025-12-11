@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { TopicDto } from '../api/types'
-import { Modal } from './Modal'
+import type { TopicDto } from '@api/types'
+import { Modal } from '@components/ui/Modal'
 
 interface TopicDetailsProps {
   topic: TopicDto | null
@@ -203,4 +203,3 @@ export function TopicDetails({
     </section>
   )
 }
-

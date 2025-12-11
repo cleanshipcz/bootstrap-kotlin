@@ -3,15 +3,13 @@ package cz.cleanship.remento.controller
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import cz.cleanship.remento.common.dto.CreateFlashcardRequest
 import cz.cleanship.remento.common.dto.FlashcardDto
-import cz.cleanship.remento.service.IFlashcardService
+import cz.cleanship.remento.config.RestExceptionHandler
+import cz.cleanship.remento.service.FlashcardService
 import org.junit.jupiter.api.Test
-import org.mockito.ArgumentMatchers.any
-import org.mockito.ArgumentMatchers.eq
+import org.mockito.Mockito.doReturn
+import org.mockito.Mockito.mock
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.`when`
-import org.springframework.beans.factory.annotation.Autowired
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest
-import org.springframework.boot.test.mock.mockito.MockBean
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete
@@ -20,15 +18,15 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
 
-@WebMvcTest(FlashcardController::class)
 class FlashcardControllerTest {
 
-    @Autowired
-    private lateinit var mockMvc: MockMvc
-
-    @MockBean
-    private lateinit var flashcardService: IFlashcardService
+    private val flashcardService: FlashcardService = mock(FlashcardService::class.java)
+    private val mockMvc: MockMvc = MockMvcBuilders
+        .standaloneSetup(FlashcardController(flashcardService))
+        .setControllerAdvice(RestExceptionHandler())
+        .build()
 
     private val objectMapper = jacksonObjectMapper()
 
@@ -36,10 +34,10 @@ class FlashcardControllerTest {
     fun `getFlashcards should return list of flashcards`() {
         val topicId = 10L
         val flashcards = listOf(
-            FlashcardDto(1L, topicId, "Q1", "A1"),
-            FlashcardDto(2L, topicId, "Q2", "A2"),
+            FlashcardDto(1L, topicId, 99L, "Q1", "A1"),
+            FlashcardDto(2L, topicId, 99L, "Q2", "A2"),
         )
-        `when`(flashcardService.getFlashcards(topicId)).thenReturn(flashcards)
+        doReturn(flashcards).`when`(flashcardService).getFlashcards(topicId)
 
         mockMvc
             .perform(get("/api/topics/$topicId/flashcards"))
@@ -53,16 +51,20 @@ class FlashcardControllerTest {
     @Test
     fun `createFlashcard should create and return flashcard`() {
         val topicId = 5L
-        val request = CreateFlashcardRequest("Q", "A")
-        val responseDto = FlashcardDto(1L, topicId, "Q", "A")
+        // The body does not contain topicId, but service call expects request with topicId injected by controller
+        val requestBody = CreateFlashcardRequest(topicId = null, question = "Q", answer = "A")
+        val requestWithTopic = CreateFlashcardRequest(topicId = topicId, question = "Q", answer = "A")
+        val responseDto = FlashcardDto(1L, topicId, 42L, "Q", "A")
 
-        `when`(flashcardService.createFlashcard(eq(topicId), any(CreateFlashcardRequest::class.java))).thenReturn(responseDto)
+        doReturn(responseDto)
+            .`when`(flashcardService)
+            .create(requestWithTopic)
 
         mockMvc
             .perform(
                 post("/api/topics/$topicId/flashcards")
                     .contentType(MediaType.APPLICATION_JSON)
-                    .content(objectMapper.writeValueAsString(request)),
+                    .content(objectMapper.writeValueAsString(requestBody)),
             ).andExpect(status().isCreated)
             .andExpect(jsonPath("$.id").value(1))
             .andExpect(jsonPath("$.question").value("Q"))
@@ -78,6 +80,19 @@ class FlashcardControllerTest {
             .perform(delete("/api/topics/$topicId/flashcards/$flashcardId"))
             .andExpect(status().isNoContent)
 
-        verify(flashcardService).deleteFlashcard(topicId, flashcardId)
+        verify(flashcardService).delete(flashcardId)
+    }
+
+    @Test
+    fun `deleteFlashcard propagates not found`() {
+        val topicId = 5L
+        val flashcardId = 99L
+        `when`(flashcardService.delete(flashcardId)).thenThrow(
+            org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.NOT_FOUND),
+        )
+
+        mockMvc
+            .perform(delete("/api/topics/$topicId/flashcards/$flashcardId"))
+            .andExpect(status().isNotFound)
     }
 }

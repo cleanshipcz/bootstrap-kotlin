@@ -29,6 +29,7 @@ data class TopicDto(
 )
 
 data class CreateTopicRequest(
+    val subjectId: Long? = null,
     val name: String,
     val studyPassage: String,
 )
@@ -41,11 +42,13 @@ data class UpdateTopicRequest(
 data class FlashcardDto(
     val id: Long?,
     val topicId: Long,
+    val subjectId: Long,
     val question: String,
     val answer: String,
 )
 
 data class CreateFlashcardRequest(
+    val topicId: Long? = null,
     val question: String,
     val answer: String,
 )

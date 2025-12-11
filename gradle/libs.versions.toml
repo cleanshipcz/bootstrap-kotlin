@@ -21,6 +21,8 @@ springBoot = "3.4.1"
 springDependencyManagement = "1.1.7"
 postgresql = "42.7.4"
 jacksonKotlin = "2.18.1"
+junitPlatform = "1.11.0"
+h2 = "2.3.232"
 
 [libraries]
 kotlinGradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
@@ -52,6 +54,8 @@ jacksonModuleKotlin = { module = "com.fasterxml.jackson.module:jackson-module-ko
 testcontainersBom = { module = "org.testcontainers:testcontainers-bom", version = "1.20.1" }
 testcontainersJunit = { module = "org.testcontainers:junit-jupiter" }
 testcontainersPostgres = { module = "org.testcontainers:postgresql" }
+junitPlatformLauncher = { module = "org.junit.platform:junit-platform-launcher", version.ref = "junitPlatform" }
+h2 = { module = "com.h2database:h2", version.ref = "h2" }
 
 # Libraries can be bundled together for easier import
 [bundles]

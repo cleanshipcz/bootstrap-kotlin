@@ -1,4 +1,7 @@
-const Colors = {
+import { MantineColorsTuple } from '@mantine/core';
+
+// Legacy colors for CSS variables
+export const Colors = {
   primary: '#336699',
   secondary: '#86BBD8',
   dark: '#2F4858',
@@ -73,5 +76,20 @@ export const applyColorPalette = () => {
   setColorVar('--color-text-muted-rgb', rgbTuple(muted))
 }
 
-export { Colors }
+// Mantine Brand Colors (Generated or Mapped)
+export const brand: MantineColorsTuple = [
+  '#eaf4fc',
+  '#d5e6f7',
+  '#abccef',
+  '#7eb1e7',
+  '#589ae0',
+  '#408cdb',
+  '#3384da', // Primary approx
+  '#2571c1',
+  '#1d64ac',
+  '#0f5697'
+];
 
+export const colors = {
+  brand,
+};

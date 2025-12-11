@@ -8,167 +8,45 @@ import cz.cleanship.remento.exception.DuplicateFlashcardQuestionException
 import cz.cleanship.remento.mapper.toDto
 import cz.cleanship.remento.repository.FlashcardRepository
 import cz.cleanship.remento.repository.TopicRepository
-import cz.cleanship.telemetry.SpanKind
 import cz.cleanship.telemetry.TelemetryFacade
-import cz.cleanship.telemetry.TelemetrySpan
-import cz.cleanship.telemetry.TimerHandle
-import org.slf4j.LoggerFactory
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.transaction.annotation.Transactional
 import org.springframework.web.server.ResponseStatusException
-import kotlin.system.measureTimeMillis
-
-interface IFlashcardService {
-    fun getFlashcards(topicId: Long): List<FlashcardDto>
-    fun createFlashcard(topicId: Long, request: CreateFlashcardRequest): FlashcardDto
-    fun updateFlashcard(topicId: Long, flashcardId: Long, request: UpdateFlashcardRequest): FlashcardDto
-    fun deleteFlashcard(topicId: Long, flashcardId: Long)
-}
 
 @Service
-@Transactional
-open class FlashcardService(
+class FlashcardService(
     private val flashcardRepository: FlashcardRepository,
     private val topicRepository: TopicRepository,
-    private val telemetry: TelemetryFacade,
-) : IFlashcardService {
+    telemetry: TelemetryFacade,
+) : BaseCrudService<Flashcard, Long, CreateFlashcardRequest, UpdateFlashcardRequest, FlashcardDto>(
+    "Flashcard", flashcardRepository, telemetry
+) {
 
-    private val listCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "list"))
-    private val createCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "create"))
-    private val deleteCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "delete"))
-    private val updateCounter = telemetry.counter("flashcards_operations_total", mapOf("operation" to "update"))
-    private val listTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "list"))
-    private val createTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "create"))
-    private val deleteTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "delete"))
-    private val updateTimer = telemetry.timer("flashcards_operation_latency_ms", mapOf("operation" to "update"))
-
-    companion object {
-        private val log = LoggerFactory.getLogger(FlashcardService::class.java)
-    }
-
-    override fun updateFlashcard(topicId: Long, flashcardId: Long, request: UpdateFlashcardRequest): FlashcardDto {
-        val flashcard = flashcardRepository.findById(flashcardId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Flashcard $flashcardId not found") }
-
-        if (flashcard.topic?.id != topicId) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Flashcard $flashcardId does not belong to topic $topicId")
-        }
-
-        val normalizedQuestion = request.question.trim()
-        val normalizedAnswer = request.answer.trim()
-
-        if (normalizedQuestion.isBlank() || normalizedAnswer.isBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Question and answer must not be blank")
-        }
-
-        if (flashcardRepository.existsByTopicIdAndQuestionAndIdNot(topicId, normalizedQuestion, flashcardId)) {
-            throw DuplicateFlashcardQuestionException(topicId, normalizedQuestion)
-        }
-
-        return tracedOperation(
-            name = "flashcards.update",
-            timer = updateTimer,
-            attributes = mapOf("component" to "FlashcardService", "topicId" to topicId, "flashcard_id" to flashcardId),
-        ) { span ->
-            flashcard.question = normalizedQuestion
-            flashcard.answer = normalizedAnswer
-            val updatedFlashcard = flashcardRepository.save(flashcard).toDto()
-            updateCounter.increment()
-            log.info(
-                "Updated flashcard id={} topic={} traceId={} spanId={}",
-                flashcardId,
-                topicId,
-                span.traceId,
-                span.spanId,
-            )
-            updatedFlashcard
-        }
-    }
-
-    override fun getFlashcards(topicId: Long): List<FlashcardDto> {
-        ensureTopicExists(topicId)
-        return tracedOperation(
-            "flashcards.list",
-            listTimer,
-            mapOf("component" to "FlashcardService", "topicId" to topicId),
-        ) { span ->
-            flashcardRepository.findByTopicId(topicId).map { it.toDto() }.also {
-                listCounter.increment()
-                log.info("Fetched {} flashcards for topic {} traceId={} spanId={}", it.size, topicId, span.traceId, span.spanId)
-            }
-        }
-    }
-
-    override fun createFlashcard(topicId: Long, request: CreateFlashcardRequest): FlashcardDto {
+    override fun createEntity(req: CreateFlashcardRequest): Flashcard {
+        val topicId = req.topicId ?: throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Topic ID required")
+        
         val topic = topicRepository.findById(topicId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Topic $topicId not found") }
-        val normalizedQuestion = request.question.trim()
-        val normalizedAnswer = request.answer.trim()
-        if (normalizedQuestion.isBlank() || normalizedAnswer.isBlank()) {
-            throw ResponseStatusException(HttpStatus.BAD_REQUEST, "Question and answer must not be blank")
-        }
-        if (flashcardRepository.existsByTopicIdAndQuestion(topicId, normalizedQuestion)) {
-            throw DuplicateFlashcardQuestionException(topicId, normalizedQuestion)
-        }
+            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Topic not found") }
 
-        val flashcard = Flashcard(
-            question = normalizedQuestion,
-            answer = normalizedAnswer,
+        return Flashcard(
+            question = req.question,
+            answer = req.answer,
             topic = topic,
+            subject = topic.subject
         )
-
-        return tracedOperation(
-            name = "flashcards.create",
-            timer = createTimer,
-            attributes = mapOf("component" to "FlashcardService", "topicId" to topicId),
-        ) { span ->
-            val savedFlashcard = flashcardRepository.save(flashcard).toDto()
-            createCounter.increment()
-            log.info("Created flashcard id={} topic={} traceId={} spanId={}", savedFlashcard.id, topicId, span.traceId, span.spanId)
-            savedFlashcard
-        }
     }
 
-    override fun deleteFlashcard(topicId: Long, flashcardId: Long) {
-        val flashcard = flashcardRepository.findById(flashcardId)
-            .orElseThrow { ResponseStatusException(HttpStatus.NOT_FOUND, "Flashcard $flashcardId not found") }
-
-        if (flashcard.topic?.id != topicId) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Flashcard $flashcardId does not belong to topic $topicId")
-        }
-
-        tracedOperation(
-            name = "flashcards.delete",
-            timer = deleteTimer,
-            attributes = mapOf("flashcard_id" to flashcardId, "topicId" to topicId, "component" to "FlashcardService"),
-        ) { span ->
-            flashcardRepository.delete(flashcard)
-            deleteCounter.increment()
-            log.info("Deleted flashcard {} topic={} traceId={} spanId={}", flashcardId, topicId, span.traceId, span.spanId)
-        }
+    override fun updateEntity(entity: Flashcard, req: UpdateFlashcardRequest) {
+        val topicId = entity.topic?.id ?: throw IllegalStateException("Flashcard topic is null")
+        
+        entity.question = req.question
+        entity.answer = req.answer
     }
 
-    private inline fun <T> tracedOperation(
-        name: String,
-        timer: TimerHandle,
-        attributes: Map<String, Any?> = emptyMap(),
-        crossinline block: (TelemetrySpan) -> T,
-    ): T {
-        telemetry.startSpan(name, SpanKind.INTERNAL, attributes).use { scope ->
-            var result: T? = null
-            val duration = measureTimeMillis {
-                result = block(scope.span)
-            }
-            timer.record(duration)
-            @Suppress("UNCHECKED_CAST")
-            return result as T
-        }
-    }
+    override fun toDto(entity: Flashcard): FlashcardDto = entity.toDto()
 
-    private fun ensureTopicExists(topicId: Long) {
-        if (!topicRepository.existsById(topicId)) {
-            throw ResponseStatusException(HttpStatus.NOT_FOUND, "Topic $topicId not found")
-        }
+    fun getFlashcards(topicId: Long): List<FlashcardDto> = telemetry.runInSpan("getFlashcardsByTopic") {
+        telemetry.counter("service.getFlashcardsByTopic").increment()
+        flashcardRepository.findByTopicId(topicId).map { toDto(it) }
     }
 }

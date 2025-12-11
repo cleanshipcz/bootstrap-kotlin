@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { SubjectDto } from '../api/types'
+import type { SubjectDto } from '@api/types'
 
 interface SubjectListProps {
   subjects: SubjectDto[]
@@ -86,4 +86,3 @@ export function SubjectList({
     </section>
   )
 }
-

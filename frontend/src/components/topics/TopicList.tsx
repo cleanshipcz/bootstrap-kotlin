@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import type { TopicDto } from '../api/types'
+import type { TopicDto } from '@api/types'
 
 interface TopicListProps {
   subjectName: string
@@ -117,4 +117,3 @@ export function TopicList({
     </section>
   )
 }
-

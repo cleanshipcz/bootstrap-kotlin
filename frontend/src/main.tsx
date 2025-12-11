@@ -1,11 +1,28 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
-import App from './App.tsx'
+import { MantineProvider, createTheme } from '@mantine/core'
+import { Notifications } from '@mantine/notifications'
+import App from './App'
+import { colors } from '@theme/colors'
+import { typography } from '@theme/typography'
+
+import '@mantine/core/styles.css'
+import '@mantine/notifications/styles.css'
 import './index.css'
+
+const theme = createTheme({
+  colors: {
+    brand: colors.brand,
+  },
+  primaryColor: 'brand',
+  ...typography,
+})
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <MantineProvider theme={theme} defaultColorScheme="dark">
+      <Notifications />
+      <App />
+    </MantineProvider>
   </React.StrictMode>,
 )
-

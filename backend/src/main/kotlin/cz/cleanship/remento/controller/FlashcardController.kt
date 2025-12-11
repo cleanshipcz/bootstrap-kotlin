@@ -3,7 +3,7 @@ package cz.cleanship.remento.controller
 import cz.cleanship.remento.common.dto.CreateFlashcardRequest
 import cz.cleanship.remento.common.dto.FlashcardDto
 import cz.cleanship.remento.common.dto.UpdateFlashcardRequest
-import cz.cleanship.remento.service.IFlashcardService
+import cz.cleanship.remento.service.FlashcardService
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.CrossOrigin
@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController
 @RequestMapping("/api/topics/{topicId}/flashcards")
 @CrossOrigin(origins = ["http://localhost:3000", "http://localhost:5173"])
 open class FlashcardController(
-    private val flashcardService: IFlashcardService,
+    private val flashcardService: FlashcardService,
 ) {
     @GetMapping
     fun getFlashcards(@PathVariable topicId: Long): ResponseEntity<List<FlashcardDto>> =
@@ -31,7 +31,7 @@ open class FlashcardController(
         @PathVariable topicId: Long,
         @RequestBody request: CreateFlashcardRequest,
     ): ResponseEntity<FlashcardDto> {
-        val flashcard = flashcardService.createFlashcard(topicId, request)
+        val flashcard = flashcardService.create(request.copy(topicId = topicId))
         return ResponseEntity.status(HttpStatus.CREATED).body(flashcard)
     }
 
@@ -40,7 +40,7 @@ open class FlashcardController(
         @PathVariable topicId: Long,
         @PathVariable flashcardId: Long,
     ): ResponseEntity<Void> {
-        flashcardService.deleteFlashcard(topicId, flashcardId)
+        flashcardService.delete(flashcardId)
         return ResponseEntity.noContent().build()
     }
 
@@ -50,5 +50,5 @@ open class FlashcardController(
         @PathVariable flashcardId: Long,
         @RequestBody request: UpdateFlashcardRequest,
     ): ResponseEntity<FlashcardDto> =
-        ResponseEntity.ok(flashcardService.updateFlashcard(topicId, flashcardId, request))
+        ResponseEntity.ok(flashcardService.update(flashcardId, request))
 }

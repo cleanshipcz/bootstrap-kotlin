@@ -18,6 +18,7 @@ class FlashcardMapperTest {
             question = "Test Question",
             answer = "Test Answer",
             topic = topic,
+            subject = subject,
         )
 
         // When
@@ -26,6 +27,7 @@ class FlashcardMapperTest {
         // Then
         assertThat(dto.id).isEqualTo(123L)
         assertThat(dto.topicId).isEqualTo(2L)
+        assertThat(dto.subjectId).isEqualTo(1L)
         assertThat(dto.question).isEqualTo("Test Question")
         assertThat(dto.answer).isEqualTo("Test Answer")
     }
@@ -39,6 +41,7 @@ class FlashcardMapperTest {
             question = "Test Question",
             answer = "Test Answer",
             topic = topic,
+            subject = subject,
         )
 
         // When
@@ -47,6 +50,7 @@ class FlashcardMapperTest {
         // Then
         assertThat(dto.id).isNull()
         assertThat(dto.topicId).isEqualTo(2L)
+        assertThat(dto.subjectId).isEqualTo(1L)
         assertThat(dto.question).isEqualTo("Test Question")
         assertThat(dto.answer).isEqualTo("Test Answer")
     }

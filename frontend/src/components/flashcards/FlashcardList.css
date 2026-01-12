@@ -1,0 +1,46 @@
+.flashcards-view {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.flashcards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.flashcard-card {
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+  padding: 1.25rem;
+  box-shadow: 0 6px 16px rgb(var(--color-dark-rgb) / 0.08);
+  background: var(--color-surface);
+}
+
+.qa-block {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  margin-bottom: 0.75rem;
+}
+
+.qa-block:last-child {
+  margin-bottom: 0;
+}
+
+.qa-block p {
+  margin: 0;
+  color: var(--color-dark);
+}
+
+.label {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.error-text {
+  color: color-mix(in srgb, var(--color-primary), var(--color-dark));
+  margin-top: 0.5rem;
+}
+

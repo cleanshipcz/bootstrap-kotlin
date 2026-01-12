@@ -1,96 +1,114 @@
-[![SonarQube Cloud](https://sonarcloud.io/images/project_badges/sonarcloud-light.svg)](https://sonarcloud.io/summary/new_code?id=cleanshipcz_bootstrap-kotlin)
+# Remento - Flashcard Learning App
 
-# Bootstrap Kotlin Application
+Remento is a cross-platform flashcard learning app focused on manual flashcard creation, clean organization, spaced repetition, and lightweight AI support.
 
-## Usage
+## Project Structure
 
-Offers a template for a Kotlin application including features like:
+- `backend/` - Spring Boot REST API (Kotlin)
+- `frontend/` - React + TypeScript web application
+- `utils/` - Shared utilities
+- `telemetry/` - Telemetry facade module
 
-* Gradle convention plugin for dependency management
-* Code style enforcement using ktlint
-* Static analysis using Detekt
-* Code coverage using Jacoco
-* Telemetry facade (see `telemetry/README.md`)
+## Tech Stack
 
-## Build and Run
+### Backend
+- **Kotlin** 2.2.20
+- **Spring Boot** 3.4.1
+- **PostgreSQL**
+- **Spring Data JPA**
+- **Kotlinx Serialization**
 
-This project uses [Gradle](https://gradle.org/).
+### Frontend
+- **React** 18.3
+- **TypeScript** 5.5
+- **Vite** 5.4
 
-To build and run the application:
+## Setup Instructions
 
-* Run `./gradlew run` to build and run the application.
-* Run `./gradlew build` to only build the application.
-* Run `./gradlew check` to run all checks, including tests.
-* Run `./gradlew clean` to clean all build outputs.
+### Prerequisites
+- JDK 21
+- PostgreSQL 12+
+- Node.js 18+ and npm
 
-Note the usage of the Gradle Wrapper (`./gradlew`).
-This is the suggested way to use Gradle in production projects.
+### Backend Setup
 
-[Learn more about the Gradle Wrapper](https://docs.gradle.org/current/userguide/gradle_wrapper.html).
-
-[Learn more about Gradle tasks](https://docs.gradle.org/current/userguide/command_line_interface.html#common_tasks).
-
-### Project Structure
-
-This project follows a multi-module setup and consists of the `app` (runnable service) and `utils` (library) subprojects as examples.
-The shared build logic is extracted to a convention plugin located in `build-logic`.
-
-### Dependency Management
-
-This project uses a version catalog (see `gradle/libs.versions.toml`) to declare and version dependencies.
-
-### Code style
-
-* This project uses [ktlint](https://ktlint.github.io/) to enforce a consistent code style.
-* You can run `./gradlew ktlintCheck` to check the code style and `./gradlew ktlintFormat` to automatically format the code.
-* You can also install the [ktlint IntelliJ plugin](https://plugins.jetbrains.com/plugin/15036-ktlint) to get real-time feedback in the IDE.
-* To disable a rule, add a rule to the `.editorconfig` file in the root of the project.
-    * Tip: use the plugin to generate the suppression for the given line, then copy the suppression to the `.editorconfig` file (replace `:` with `-`)
-
-#### Static analysis
-
-* This project uses [Detekt](https://detekt.dev/) for Kotlin static code analysis.
-* Run `./gradlew detekt` to analyze the code. Detekt is also wired into `./gradlew check`.
-* Configuration lives in `detekt.yml` at the project root. Adjust rules there to fit your needs.
-* Formatting rules are enabled via `detekt-formatting` to align with ktlint.
-* To use a baseline, generate one with `./gradlew detektBaseline` and configure the `baseline` property in the Detekt settings (see `build-logic/convention/src/main/kotlin/cz/cleanship/plugin/KotlinJvmConventionPlugin.kt`).
-
-**Disabling code analysis for local development:**
-
-When prototyping or testing, you may want to skip code analysis (ktlint + Detekt) to speed up builds. You can disable it in three ways:
-
-1. **Uncomment in `gradle.properties`** (tracked in git, affects all developers):
-   ```properties
-   skipLocalCodeAnalysis=true
-   ```
-
-2. **Use command-line flag** (temporary, single build):
+1. **Start PostgreSQL with Docker Compose**:
    ```bash
-   ./gradlew build -PskipLocalCodeAnalysis=true
+   docker-compose up -d
+   ```
+   
+2. **Run the backend**:
+   ```bash
+   ./gradlew :backend:bootRun
    ```
 
-3. **Create `gradle.local.properties`** (recommended for local-only overrides, already in `.gitignore`):
-   ```properties
-   skipLocalCodeAnalysis=true
+The backend will start on `http://localhost:8080`
+
+### Frontend Setup
+
+1. **Install dependencies**:
+   ```bash
+   cd frontend
+   npm install
    ```
 
-By default, code analysis is enabled to ensure code quality. CI/CD pipelines will always enforce it.
+2. **Start development server**:
+   ```bash
+   npm run dev
+   ```
+   
+   The frontend will start on `http://localhost:3000`
 
-## Features
+## Development
 
-### Shared build logic
+### Backend
+- Run tests: `./gradlew :backend:test`
+- Build: `./gradlew :backend:build`
+- Run: `./gradlew :backend:bootRun`
 
-* This project uses a shared build logic in `build-logic`.
-* It is based on the [Gradle Kotlin DSL](https://docs.gradle.org/current/userguide/kotlin_dsl.html).
-* Use plugin `cleanship.kotlin.library` to make use of the shared build logic.
-  ```kotlin
-  plugins {
-      alias(libs.plugins.cleanship.kotlin.library)
-  }
-  ```
+### Frontend
+- Development: `npm run dev`
+- Build: `npm run build`
+- Preview: `npm run preview`
 
-### Telemetry
+## API Endpoints
 
-* This project uses [OpenTelemetry](https://opentelemetry.io/) for telemetry.
-* See `telemetry/README.md` for more details.
-* Included in the `cleanship.kotlin.library` plugin.
+### Subjects
+- `GET /api/subjects` – list subjects with topic summaries
+- `GET /api/subjects/{id}` – get a subject with its topics
+- `POST /api/subjects` – create a subject
+- `PUT /api/subjects/{id}` – rename a subject
+- `DELETE /api/subjects/{id}` – remove a subject and its topics
+
+### Topics
+- `GET /api/subjects/{subjectId}/topics` – list topics for a subject
+- `GET /api/topics/{topicId}` – get a topic with its study passage and flashcards
+- `POST /api/subjects/{subjectId}/topics` – create a topic (study passage limit: 2000 chars)
+- `PUT /api/topics/{topicId}` – update topic name or study passage
+- `DELETE /api/topics/{topicId}` – delete a topic
+
+### Flashcards
+- `GET /api/topics/{topicId}/flashcards` – list flashcards in a topic
+- `POST /api/topics/{topicId}/flashcards` – create a flashcard (enforces unique question per topic)
+- `DELETE /api/topics/{topicId}/flashcards/{flashcardId}` – delete a flashcard
+
+## Architecture
+
+The backend follows a clean architecture pattern:
+- **Domain Layer**: Entities (`Subject`, `Topic`, `Flashcard`)
+- **Repository Layer**: Data access interfaces
+- **Service Layer**: Business logic with interfaces for extensibility
+- **Controller Layer**: REST API endpoints
+- **DTO Layer**: Data transfer objects for API communication
+
+The frontend is structured for easy migration to React Native/Expo:
+- API client is abstracted and can be swapped for mobile implementations
+- Components are reusable and can be adapted to React Native components
+
+## Next Steps
+
+- [ ] Implement spaced repetition system
+- [ ] Add flashcard quiz interface
+- [ ] Add topic summaries
+- [ ] Prepare for mobile (React Native/Expo)
+- [ ] Add AI features (GPT integration)

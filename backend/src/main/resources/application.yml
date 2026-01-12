@@ -1,0 +1,25 @@
+spring:
+  application:
+    name: remento-backend
+  profiles:
+    active: ${SPRING_PROFILES_ACTIVE:postgres}
+  datasource:
+    url: jdbc:postgresql://localhost:5432/remento
+    username: remento
+    password: remento
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+server:
+  port: 8080
+
+logging:
+  level:
+    root: INFO
+    cz.cleanship.remento: DEBUG

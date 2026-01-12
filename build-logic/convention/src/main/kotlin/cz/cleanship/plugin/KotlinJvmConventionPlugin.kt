@@ -65,6 +65,7 @@ class KotlinJvmConventionPlugin : Plugin<Project> {
             dependencies.add("testImplementation", libs.findLibrary("assertjCore").get())
             dependencies.add("testImplementation", libs.findLibrary("mockk").get())
             dependencies.add("testImplementation", libs.findLibrary("kotlinxCoroutinesTest").get())
+            dependencies.add("testRuntimeOnly", libs.findLibrary("junitPlatformLauncher").get())
 
             tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
                 useJUnitPlatform()
